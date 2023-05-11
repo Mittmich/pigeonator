@@ -1,3 +1,5 @@
 opencv-python
 ipykernel
+onvif_zeep
 matplotlib
+click
