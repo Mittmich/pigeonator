@@ -1,2 +1,4 @@
 playground/*
 *.pyc
+train_model/raw_data/*
+train_model/data/*
