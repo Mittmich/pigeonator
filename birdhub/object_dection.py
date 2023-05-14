@@ -2,6 +2,7 @@
 
 import torch
 import numpy as np
+from PIL import Image, ImageDraw, ImageFont
 from yolov5.models.common import DetectMultiBackend
 from yolov5.utils.general import non_max_suppression
 from yolov5.utils.torch_utils import select_device
@@ -59,4 +60,15 @@ class BirdDetectorYolov5:
         boxes = self._get_boxes(stacked)
         return birds, confidences, boxes, stacked
 
-
+    @staticmethod
+    def show_bbox(image, boxes, labels):
+        draw = ImageDraw.Draw(Image.fromarray(image))
+        for box, label in zip(boxes, labels):
+            x1, y1, x2, y2 = box
+            # Draw the bounding box with red lines
+            draw.rectangle((x1, y1, x2, y2),
+                            outline=(255, 0, 0), # Red in RGB
+                            width=5)             # Line width
+            font = ImageFont.truetype("arial.ttf", 30)
+            draw.text((x1, y1 - 30), label, fill=(255, 0, 0), font=font) # Black in RGB
+        image.show()
