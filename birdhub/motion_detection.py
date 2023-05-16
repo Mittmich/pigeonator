@@ -1,7 +1,18 @@
 """Classes for motion detection"""
 import cv2
+from abc import ABC, abstractmethod
+import numpy as np
 
-class SimpleMotionDetector:
+class MotionDetector(ABC):
+    """Base class for motion detectors"""
+
+    @abstractmethod
+    def detect(self, frame, previous_frame):
+        """Detect motion between the current frame and the previous frame"""
+        raise NotImplementedError
+
+
+class SimpleMotionDetector(MotionDetector):
     """Simple motion detector that compares the current frame with the previous frame"""
 
     def __init__(self, threshold=20, blur=21, dilation_kernel=np.ones((5,5)), threshold_area=50):

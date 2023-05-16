@@ -1,25 +1,25 @@
 import click
-from video import Stream, VideoWriter
+from birdhub.recorder import ContinuousRecorder
 
 
 @click.group()
 def cli():
     pass
 
+@click.group()
+def record():
+    pass
 
 @click.command()
 @click.argument('url')
-@click.argument('outputfile')
+@click.argument('outputdir')
 @click.option('--fps', type=int, default=10)
-def record(url, outputfile, fps):
+def continuous(url, outputdir, fps):
     """Record from video stream and save to file"""
-    with Stream(url) as stream:
-        print(stream.frameSize)
-        with VideoWriter(outputfile, fps, stream.frameSize) as writer:
-            for frame in stream:
-                writer.write(frame)
+    recorder = ContinuousRecorder(url)
+    recorder.record(outputdir, fps)
 
-
+record.add_command(continuous)
 cli.add_command(record)
 
 if __name__ == '__main__':
