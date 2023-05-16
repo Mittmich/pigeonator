@@ -48,13 +48,19 @@ class MotionRecoder(Recorder):
             writer = None
             stop_recording_in = 0
             for frame in stream:
-                if previous_frame is not None and self._detector.detect(frame, previous_frame) and stop_recording_in == 0:
+                if previous_frame is not None:
+                    rect = self._detector.detect(frame, previous_frame)
+                else:
+                    rect = []
+                if rect and writer is None:
                     logger.info("Motion detected")
                     output_file = os.path.join(outputDir, f"{self._get_timestamp()}.avi")
                     writer = VideoWriter(output_file, fps, stream.frameSize)
+                if rect and writer is not None:
                     stop_recording_in = self._slack
-                elif stop_recording_in > 0:
+                else:
                     stop_recording_in -= 1
+                # write frame to file if needed
                 if stop_recording_in > 0:
                     writer.write(frame)
                 else:
