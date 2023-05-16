@@ -36,7 +36,30 @@ class ContinuousRecorder(Recorder):
 
 class MotionRecoder(Recorder):
 
-    def __init__(self, stream_url: str, motion_detector: MotionDetector, file_prefix:Optional[str]=None, slack:int=10) -> None:
+    def __init__(self, stream_url: str, motion_detector: MotionDetector, slack:int=100) -> None:
         self._stream_url = stream_url
         self._detector = motion_detector
         self._slack = slack
+    
+    def record(self, outputDir: str, fps: int = 10) -> None:
+        with Stream(self._stream_url) as stream:
+            logger.info(f"Recording to {outputDir}")
+            previous_frame = None
+            writer = None
+            stop_recording_in = 0
+            for frame in stream:
+                if previous_frame is not None and self._detector.detect(frame, previous_frame) and stop_recording_in == 0:
+                    logger.info("Motion detected")
+                    output_file = os.path.join(outputDir, f"{self._get_timestamp()}.avi")
+                    writer = VideoWriter(output_file, fps, stream.frameSize)
+                    stop_recording_in = self._slack
+                elif stop_recording_in > 0:
+                    stop_recording_in -= 1
+                if stop_recording_in > 0:
+                    writer.write(frame)
+                else:
+                    if writer is not None:
+                        logger.info("   Recording stopped")
+                        writer.release()
+                        writer = None
+                previous_frame = frame

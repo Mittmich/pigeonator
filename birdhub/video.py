@@ -51,6 +51,10 @@ class VideoWriter:
         """Return the VideoWriter object."""
         return self
     
+    def release(self):
+        """Release the VideoWriter object."""
+        self.videoWriter.release()
+
     def __exit__(self, exc_type, exc_value, traceback):
         """Release the VideoWriter object."""
         self.videoWriter.release()
