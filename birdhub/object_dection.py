@@ -41,6 +41,7 @@ class BirdDetectorYolov5:
         return prediction[:, :4].numpy().tolist()
 
     def detect_birds(self, im):
+        # TODO: resize if needed
         # assumes im is in opencv BGR format
         im = im.transpose(2,0,1)[::-1] # BGR to RGB
         im = np.ascontiguousarray(im)
@@ -62,7 +63,8 @@ class BirdDetectorYolov5:
 
     @staticmethod
     def show_bbox(image, boxes, labels):
-        draw = ImageDraw.Draw(Image.fromarray(image))
+        image = Image.fromarray(image)
+        draw = ImageDraw.Draw(image)
         for box, label in zip(boxes, labels):
             x1, y1, x2, y2 = box
             # Draw the bounding box with red lines

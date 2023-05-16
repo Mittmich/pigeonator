@@ -3,3 +3,4 @@ playground/*
 train_model/raw_data/*
 train_model/data/*
 *.pt
+.env
