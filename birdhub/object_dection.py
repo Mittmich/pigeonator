@@ -55,7 +55,7 @@ class BirdDetectorYolov5:
                                       self._confidence_threshold,
                                       self._iou_threhsold,
                                       max_det=1000)
-        stacked = torch.cat(results, 0)
+        stacked = torch.cat(results, 0).cpu()
         birds = self._extract_birds_from_prediction(stacked)
         confidences = self._get_confidences(stacked)
         boxes = self._get_boxes(stacked)

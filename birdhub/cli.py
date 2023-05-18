@@ -27,7 +27,7 @@ def continuous(url, outputdir, fps):
 @click.option('--slack', type=int, default=100)
 def motion(url, outputdir, fps, slack):
     """Record from video stream and save to file"""
-    detector = SimpleMotionDetector()
+    detector = SimpleMotionDetector(threshold_area=500)
     recorder = MotionRecoder(url, detector, slack=slack)
     recorder.record(outputdir, fps)
 
