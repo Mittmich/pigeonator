@@ -1,0 +1,1 @@
+python ../yolov5/export.py --weights C:\Users\michael.mitter\Documents\Programming\thepigeoniator\yolov5\runs\train\exp13\weights\best.pt --include onnx

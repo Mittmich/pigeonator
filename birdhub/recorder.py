@@ -36,10 +36,11 @@ class ContinuousRecorder(Recorder):
 
 class MotionRecoder(Recorder):
 
-    def __init__(self, stream_url: str, motion_detector: MotionDetector, slack:int=100) -> None:
+    def __init__(self, stream_url: str, motion_detector: MotionDetector, slack:int=100, activation_frames:int=3) -> None:
         self._stream_url = stream_url
         self._detector = motion_detector
         self._slack = slack
+        self._activation_frames = activation_frames
     
     def record(self, outputDir: str, fps: int = 10) -> None:
         with Stream(self._stream_url) as stream:
@@ -47,15 +48,26 @@ class MotionRecoder(Recorder):
             previous_frame = None
             writer = None
             stop_recording_in = 0
+            motion_frames = 0
+            look_back_frames = []
             for frame in stream:
                 if previous_frame is not None:
                     rect = self._detector.detect(frame, previous_frame)
                 else:
                     rect = []
                 if rect and writer is None:
-                    logger.info("Motion detected")
-                    output_file = os.path.join(outputDir, f"{self._get_timestamp()}.avi")
-                    writer = VideoWriter(output_file, fps, stream.frameSize)
+                    if motion_frames < self._activation_frames:
+                        motion_frames += 1
+                        look_back_frames.append(frame)
+                    else:
+                        logger.info("Motion detected")
+                        output_file = os.path.join(outputDir, f"{self._get_timestamp()}.avi")
+                        writer = VideoWriter(output_file, fps, stream.frameSize)
+                        if len(look_back_frames) > 0:
+                            logger.info("   Writing lookback frames")
+                            for look_back_frame in look_back_frames:
+                                writer.write(look_back_frame)
+                            look_back_frames = []
                 if rect and writer is not None:
                     stop_recording_in = self._slack
                 else:
@@ -66,6 +78,9 @@ class MotionRecoder(Recorder):
                 else:
                     if writer is not None:
                         logger.info("   Recording stopped")
+                        motion_frames = 0
                         writer.release()
                         writer = None
                 previous_frame = frame
+                if len(look_back_frames) > self._activation_frames:
+                    look_back_frames = look_back_frames[-self._activation_frames:]
