@@ -51,6 +51,7 @@ class MotionRecoder(Recorder):
             motion_frames = 0
             look_back_frames = []
             for frame in stream:
+                look_back_frames.append(frame)
                 if previous_frame is not None:
                     rect = self._detector.detect(frame, previous_frame)
                 else:
@@ -58,16 +59,13 @@ class MotionRecoder(Recorder):
                 if rect and writer is None:
                     if motion_frames < self._activation_frames:
                         motion_frames += 1
-                        look_back_frames.append(frame)
                     else:
                         logger.info("Motion detected")
                         output_file = os.path.join(outputDir, f"{self._get_timestamp()}.avi")
                         writer = VideoWriter(output_file, fps, stream.frameSize)
-                        if len(look_back_frames) > 0:
-                            logger.info("   Writing lookback frames")
-                            for look_back_frame in look_back_frames:
-                                writer.write(look_back_frame)
-                            look_back_frames = []
+                        logger.info("   Writing lookback frames")
+                        for look_back_frame in look_back_frames:
+                            writer.write(look_back_frame)
                 if rect and writer is not None:
                     stop_recording_in = self._slack
                 else:
