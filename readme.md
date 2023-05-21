@@ -47,3 +47,7 @@ For further details on each of the command options, use the `--help` option:
 
 ```bash
 pgn --help
+```
+
+## Data set for model training
+The data used for training the object detection model can be found on roboflow: https://universe.roboflow.com/michael-mitter-6ffsp/pigeonator
