@@ -52,10 +52,7 @@ class MotionRecoder(Recorder):
             look_back_frames = []
             for frame in stream:
                 look_back_frames.append(frame)
-                if previous_frame is not None:
-                    rect = self._detector.detect(frame, previous_frame)
-                else:
-                    rect = []
+                rect = self._detector.detect(frame, previous_frame)
                 if rect and writer is None:
                     if motion_frames < self._activation_frames:
                         motion_frames += 1

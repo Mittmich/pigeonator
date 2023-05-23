@@ -33,6 +33,9 @@ class SimpleMotionDetector(MotionDetector):
 
     def detect(self, frame, previous_frame):
         """Detect motion between the current frame and the previous frame"""
+        # guard against None
+        if frame is None or previous_frame is None:
+            return []
         # Convert the frames to grayscale
         prep_frame, prep_previous = self._preprocess_image(frame), self._preprocess_image(previous_frame)
 

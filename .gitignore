@@ -6,3 +6,4 @@ train_model/data/*
 .env
 birdhub.egg-info/*
 *.avi
+.vscode
