@@ -74,3 +74,38 @@ class BirdDetectorYolov5:
             font = ImageFont.truetype("arial.ttf", 30)
             draw.text((x1, y1 - 30), label, fill=(255, 0, 0), font=font) # Black in RGB
         image.show()
+
+
+class SingleClassImageSequence():
+    """Accumulates object predictions and implements functionality to
+    determine to most likely class of the object in the sequence.
+    When there are multiple objects in the seuqence, the class with the
+    highest cumulative confidence is returned.
+    For example, if there are 2 predictions for pigeon with confidence 0.2 each
+    and one prediction for crow, then crow will be returned.
+    If the pigeions in the example above had confidence 0.5 each, then pigeon would
+    be returned. 
+    If there are multiple objects within the same frame, they areaccumulated together.
+    """
+
+
+    def __init__(self, minimum_number_detections:int=5, ) -> None:
+        self._detections = {}
+        self._number_detections = 0
+        self._minimum_number_detections = minimum_number_detections
+    
+    def add_detections(self, objects, confidences):
+        for obj, conf in zip(objects, confidences):
+            self._number_detections += 1
+            if obj not in self._detections:
+                self._detections[obj] = conf
+            self._detections[obj] = self._detections[obj] + conf
+    
+    def has_reached_consensus(self):
+        return self._number_detections >= self._minimum_number_detections
+    
+    def get_most_likely_object(self):
+        if self._number_detections < self._minimum_number_detections:
+            return None
+        return max(self._detections, key=self._detections.get)
+        
