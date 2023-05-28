@@ -40,6 +40,16 @@ def long_single_frame_motion_stream(empty_array, random_array):
     stream.__enter__.return_value = frameSequence
     return stream
 
+@pytest.fixture
+def multiple_motion_events_stream(empty_array, random_array):
+    # Creating a mock stream with intermittent motion frames
+    stream = MagicMock()
+    frameSequence = MagicMock()
+    # stream starts wih 3 motions, then stills, then one motion frame
+    frameSequence.__iter__.return_value = [empty_array] + [random_array] + [empty_array] + [random_array] + 10 * [random_array] + 10*[empty_array]
+    stream.__enter__.return_value = frameSequence
+    return stream
+
 
 def test_ContinuousRecorder_record():
     with patch('birdhub.recorder.Stream') as MockStream, \
@@ -81,6 +91,30 @@ def test_MotionRecoder_does_not_record_below_activation_frames(single_frame_moti
         mr.record('/path/to/output/dir', fps=10)
         MockStream.assert_called_once_with('http://example.com')
         MockVideoWriter.assert_not_called()
+
+def test_MotionRecorder_does_not_record_below_activation_frames_multiple_sequences(multiple_motion_events_stream):
+    with patch('birdhub.recorder.Stream') as MockStream, \
+         patch('birdhub.recorder.VideoWriter') as MockVideoWriter:
+        MockStream.return_value = multiple_motion_events_stream
+        writer = MagicMock()
+        MockVideoWriter.return_value = writer
+        mr = MotionRecoder('http://example.com', SimpleMotionDetector(), slack=5, activation_frames=3)
+        mr.record('/path/to/output/dir', fps=10)
+        MockStream.assert_called_once_with('http://example.com')
+        writer.write.assert_not_called()
+
+def test_MotionRecorder_respects_activation_frames_multiple_sequences(multiple_motion_events_stream):
+    with patch('birdhub.recorder.Stream') as MockStream, \
+         patch('birdhub.recorder.VideoWriter') as MockVideoWriter:
+        MockStream.return_value = multiple_motion_events_stream
+        writer = MagicMock()
+        MockVideoWriter.return_value = writer
+        mr = MotionRecoder('http://example.com', SimpleMotionDetector(), slack=2, activation_frames=2)
+        mr.record('/path/to/output/dir', fps=10)
+        MockStream.assert_called_once_with('http://example.com')
+        writer.write.assert_called()
+        assert writer.write.call_count == 5
+
 
 def test_MotionRecoder_respects_slack(long_single_frame_motion_stream, empty_array):
     with patch('birdhub.recorder.Stream') as MockStream, \

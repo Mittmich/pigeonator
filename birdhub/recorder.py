@@ -65,8 +65,10 @@ class MotionRecoder(Recorder):
                             writer.write(look_back_frame)
                 if rect and writer is not None:
                     stop_recording_in = self._slack
-                else:
+                if not rect and writer is not None:
                     stop_recording_in -= 1
+                if not rect and writer is None:
+                    motion_frames = 0
                 # write frame to file if needed
                 if stop_recording_in > 0:
                     writer.write(frame)
