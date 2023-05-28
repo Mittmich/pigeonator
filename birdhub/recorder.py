@@ -41,43 +41,49 @@ class MotionRecoder(Recorder):
         self._detector = motion_detector
         self._slack = slack
         self._activation_frames = activation_frames
+        self._previous_frame = None
+        self._stop_recording_in = 0
+        self._motion_frames = 0
+        self._look_back_frames = []
+        self._writer = None
+
+    def _initialize_video_writer(self, outputDir, fps, frameSize):
+        logger.log_event("motion_detected","Motion detected")
+        output_file = os.path.join(outputDir, f"{self._get_timestamp()}.avi")
+        self._writer = VideoWriter(output_file, fps, frameSize)
+        for look_back_frame in self._look_back_frames:
+            self._writer.write(look_back_frame)
+    
+    def _destroy_video_writer(self):
+        if self._writer is not None:
+            logger.log_event("recording_stopped","Recording stopped")
+            self._motion_frames = 0
+            self._writer.release()
+            self._writer = None
+
     
     def record(self, outputDir: str, fps: int = 10) -> None:
         with Stream(self._stream_url) as stream:
-            logger.info(f"Recording to {outputDir}")
-            previous_frame = None
-            writer = None
-            stop_recording_in = 0
-            motion_frames = 0
-            look_back_frames = []
+            logger.log_event("recording_init",f"Recording to {outputDir}")
             for frame in stream:
-                look_back_frames.append(frame)
-                rect = self._detector.detect(frame, previous_frame)
-                if rect and writer is None:
-                    if motion_frames < self._activation_frames:
-                        motion_frames += 1
+                self._look_back_frames.append(frame)
+                rect = self._detector.detect(frame, self._previous_frame)
+                if rect and self._writer is None:
+                    if self._motion_frames < self._activation_frames:
+                        self._motion_frames += 1
                     else:
-                        logger.info("Motion detected")
-                        output_file = os.path.join(outputDir, f"{self._get_timestamp()}.avi")
-                        writer = VideoWriter(output_file, fps, stream.frameSize)
-                        logger.info("   Writing lookback frames")
-                        for look_back_frame in look_back_frames:
-                            writer.write(look_back_frame)
-                if rect and writer is not None:
-                    stop_recording_in = self._slack
-                if not rect and writer is not None:
-                    stop_recording_in -= 1
-                if not rect and writer is None:
-                    motion_frames = 0
+                        self._initialize_video_writer( outputDir, fps, stream.frameSize)
+                if rect and self._writer is not None:
+                    self._stop_recording_in = self._slack
+                if not rect and self._writer is not None:
+                    self._stop_recording_in -= 1
+                if not rect and self._writer is None:
+                    self._motion_frames = 0
                 # write frame to file if needed
-                if stop_recording_in > 0:
-                    writer.write(frame)
+                if self._stop_recording_in > 0:
+                    self._writer.write(frame)
                 else:
-                    if writer is not None:
-                        logger.info("   Recording stopped")
-                        motion_frames = 0
-                        writer.release()
-                        writer = None
-                previous_frame = frame
-                if len(look_back_frames) > self._activation_frames:
-                    look_back_frames = look_back_frames[-self._activation_frames:]
+                    self._destroy_video_writer()
+                self._previous_frame = frame
+                if len(self._look_back_frames) > self._activation_frames:
+                    self._look_back_frames = self._look_back_frames[-self._activation_frames:]
