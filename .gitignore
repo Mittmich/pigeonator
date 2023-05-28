@@ -7,3 +7,4 @@ train_model/data/*
 birdhub.egg-info/*
 *.avi
 .vscode
+logs/*
