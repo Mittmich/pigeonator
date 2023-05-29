@@ -9,16 +9,34 @@ from birdhub.logging import logger
 
 class Recorder(ABC):
     
-    def __init__(self, stream_url: str) -> None:
-        self._stream_url = stream_url
+    def __init__(self, outputDir: str, fps: int = 10) -> None:
+        self._outputDir = outputDir
+        self._fps = fps
     
 
     def _get_timestamp(self) -> str:
         return datetime.now().strftime("%Y%m%d_%H%M%S")
 
     @abstractmethod
-    def record(self, outputDir: str, fps: int = 10) -> None:
-        raise NotImplementedError
+    def register_start_recording(self):
+        pass
+
+    @abstractmethod
+    def register_stop_recording(self):
+        pass
+
+    @abstractmethod
+    def register_frame(self):
+        pass
+
+    @abstractmethod
+    def register_detection(self):
+        pass
+
+    @abstractmethod
+    def register_effect_action(self):
+        pass
+
 
 class ContinuousRecorder(Recorder):
 

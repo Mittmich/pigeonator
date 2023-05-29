@@ -1,11 +1,13 @@
 """Functionality to orchestrate streams, detectors, recorders, and other components."""
 
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Optional, auto
 from video import Stream
 from recorder import Recorder
 from detection import Detector
 from effectors import Effector
+from logging import logger
+
 
 class Mediator(ABC):
     """
@@ -14,7 +16,7 @@ class Mediator(ABC):
     pass the execution to other components.
     """
     @abstractmethod
-    def notify(self, sender: object, event: str) -> None:
+    def notify(self, event: str, data: object) -> None:
         pass
 
 
@@ -27,3 +29,31 @@ class VideoEventManager(Mediator):
         self._detector = detector
         self._effector = effector
 
+
+    def notify(self, event: str, data: object) -> None:
+        if event == "video_frame":
+            if self._detector is not None:
+                self._detector.detect(data)
+            if self._recorder is not None:
+                self._recorder.register_frame(data) # This is needed for lookback recording
+        if event == "detection_start":
+            logger.log_event("detection_start", data.get("meta_information", None))
+            if self._recorder is not None:
+                self._recorder.register_start_recording(data)
+                self._recorder.register_detection(data)
+            if self._effector is not None:
+                self._effector.activate(data)
+        if event == "detection":
+            logger.log_event("detection", data.get("meta_information", None))
+            if self._recorder is not None:
+                self._recorder.register_detection(data)
+        if event == "detetction_stop":
+            logger.log_event("detection_stop", data.get("meta_information", None))
+            if self._effector is not None:
+                self._effector.deactivate()
+            if self._recorder is not None:
+                self._recorder.register_stop_recording()
+        if event == "effect_activated":
+            logger.log_event("effect_activated", data.get("meta_information", None))
+            if self._recorder is not None:
+                self._recorder.register_effect_action(data)
