@@ -51,6 +51,47 @@ class ContinuousRecorder(Recorder):
     def register_frame(self, frame):
         self._writer.write(frame)
 
+class EventRecorder(Recorder):
+
+    def __init__(self, outputDir: str, frame_size: Tuple[int], fps: int = 10, slack:int=100, look_back_frames:int=3) -> None:
+        super().__init__(outputDir, frame_size, fps)
+        self._slack = slack
+        self._look_back_frames = []
+        self._look_back_frames_limit = look_back_frames
+        self._recording = False
+        self._writer = None
+        self._stop_recording_in = 0
+    
+    def register_frame(self, frame):
+        self._look_back_frames.append(frame)
+        if len(self._look_back_frames) < self._look_back_frames_limit:
+            self._look_back_frames = self._look_back_frames[-self._activation_frames:]
+        if self._recording:
+            self._writer.write(frame)
+        if not self._recording and self._stop_recording_in > 0:
+            self._writer.write(frame)
+            self._stop_recording_in -= 1
+    
+    def register_start_recording(self, detection_data: object):
+        if self._writer:
+            self.register_detection(detection_data)
+        else:
+            self._writer = VideoWriter(self._get_recording_output_file(), self._fps, self._frame_size)
+            self._stop_recording_in = self._slack
+            self._recording = True
+            # write look back frames
+            for frame in self._look_back_frames:
+                self._writer.write(frame)
+            self._look_back_frames = []
+            # TODO: wirte detection data to a file
+    
+    def register_detection(self, detection_data):
+        self._stop_recording_in = self._slack
+        # TODO: write detection data to a file
+    
+    def register_stop_recording(self):
+        self._recording = False
+
 
 # class MotionRecoder(Recorder):
 

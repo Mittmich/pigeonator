@@ -43,7 +43,6 @@ class VideoEventManager(Mediator):
             logger.log_event("detection_start", data.get("meta_information", None))
             if self._recorder is not None:
                 self._recorder.register_start_recording(data)
-                self._recorder.register_detection(data)
             if self._effector is not None:
                 self._effector.activate(data)
         if event == "detection":
