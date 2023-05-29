@@ -1,15 +1,25 @@
 """A module to handle video streams and video files."""
 import cv2
+from birdhub.orchestration import Mediator
 
 class Stream:
 
     def __init__(self, streamurl):
         self.streamurl = streamurl
         self.cap = cv2.VideoCapture(self.streamurl)
+        self._event_manager = None
 
     def get_frame(self):
         ret, frame = self.cap.read()
         return frame
+
+    def add_event_manager(self, event_manager: Mediator):
+        self._event_manager = event_manager
+
+    def stream(self):
+        while True:
+            ret, frame = self.cap.read()
+            self._event_manager.notify("video_frame", frame)
     
     def __enter__(self):
         return self

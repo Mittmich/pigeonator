@@ -1,12 +1,8 @@
 """Functionality to orchestrate streams, detectors, recorders, and other components."""
 
 from abc import ABC, abstractmethod
-from typing import Optional, auto
-from video import Stream
-from recorder import Recorder
-from detection import Detector
-from effectors import Effector
-from logging import logger
+from typing import Optional
+from birdhub.logging import logger
 
 
 class Mediator(ABC):
@@ -22,12 +18,19 @@ class Mediator(ABC):
 
 class VideoEventManager(Mediator):
     
-    def __init__(self, stream: Stream, recorder: Optional[Recorder]=None, detector: Optional[Detector]=None, effector:Optional[Effector]=None) -> None:
-        super().__init__()
+    def __init__(self, stream: 'Stream', recorder: Optional['Recorder']=None, detector: Optional['Detector']=None, effector:Optional['Effector']=None) -> None:
         self._stream = stream
         self._recorder = recorder
         self._detector = detector
         self._effector = effector
+        # register mediator object
+        self._stream.add_event_manager(self)
+        if self._recorder is not None:
+            self._recorder.add_event_manager(self)
+        if self._detector is not None:
+            self._detector.mediater = self
+        if self._effector is not None:
+            self._effector.mediater = self
 
 
     def notify(self, event: str, data: object) -> None:

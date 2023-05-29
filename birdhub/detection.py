@@ -8,11 +8,20 @@ from PIL import Image, ImageDraw, ImageFont
 from yolov5.models.common import DetectMultiBackend
 from yolov5.utils.general import non_max_suppression
 from yolov5.utils.torch_utils import select_device
+from birdhub.orchestration import Mediator
 
 
 class Detector(ABC):
     """Base class for detectors"""
 
+    def __init__(self) -> None:
+        self._event_manager = None
+
+    def add_event_manager(self, event_manager: Mediator):
+        self._event_manager = event_manager
+
+
+    # TODO: unify detection output format
     @abstractmethod
     def detect(self, frame):
         raise NotImplementedError
@@ -26,6 +35,7 @@ class SimpleMotionDetector(Detector):
         self._blur = blur
         self._dilation_kernel = dilation_kernel
         self._threshold_area = threshold_area
+        self._previous_frame = None
 
     def _preprocess_image(self, image):
         """Preprocess the image"""
@@ -37,13 +47,14 @@ class SimpleMotionDetector(Detector):
 
         return blur
 
-    def detect(self, frame, previous_frame):
+    def detect(self, frame):
         """Detect motion between the current frame and the previous frame"""
         # guard against None
-        if frame is None or previous_frame is None:
+        if frame is None or self._previous_frame is None:
+            self._previous_frame = frame
             return []
         # Convert the frames to grayscale
-        prep_frame, prep_previous = self._preprocess_image(frame), self._preprocess_image(previous_frame)
+        prep_frame, prep_previous = self._preprocess_image(frame), self._preprocess_image(self._previous_frame)
 
         # Calculate the absolute difference between the current frame and the previous frame
         frame_delta = cv2.absdiff(prep_previous, prep_frame)
@@ -66,6 +77,8 @@ class SimpleMotionDetector(Detector):
             (x, y, w, h) = cv2.boundingRect(contour)
             rects.append([x, y, x + w, y + h])
 
+        # Update the previous frame
+        self._previous_frame = frame
         # Return the rectangles
         return rects
 
