@@ -1,6 +1,7 @@
 """A module to handle video streams and video files."""
 import cv2
 from birdhub.orchestration import Mediator
+from birdhub.logging import logger
 
 class Stream:
 
@@ -17,6 +18,7 @@ class Stream:
         self._event_manager = event_manager
 
     def stream(self):
+        logger.log_event("stream_started", None)
         while True:
             ret, frame = self.cap.read()
             self._event_manager.notify("video_frame", frame)

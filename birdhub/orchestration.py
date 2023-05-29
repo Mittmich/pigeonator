@@ -28,9 +28,9 @@ class VideoEventManager(Mediator):
         if self._recorder is not None:
             self._recorder.add_event_manager(self)
         if self._detector is not None:
-            self._detector.mediater = self
+            self._detector.add_event_manager(self)
         if self._effector is not None:
-            self._effector.mediater = self
+            self._effector.add_event_manager(self)
 
 
     def notify(self, event: str, data: object) -> None:
@@ -39,22 +39,12 @@ class VideoEventManager(Mediator):
                 self._detector.detect(data)
             if self._recorder is not None:
                 self._recorder.register_frame(data) # This is needed for lookback recording
-        if event == "detection_start":
-            logger.log_event("detection_start", data.get("meta_information", None))
-            if self._recorder is not None:
-                self._recorder.register_start_recording(data)
-            if self._effector is not None:
-                self._effector.activate(data)
         if event == "detection":
             logger.log_event("detection", data.get("meta_information", None))
             if self._recorder is not None:
                 self._recorder.register_detection(data)
-        if event == "detetction_stop":
-            logger.log_event("detection_stop", data.get("meta_information", None))
             if self._effector is not None:
-                self._effector.deactivate()
-            if self._recorder is not None:
-                self._recorder.register_stop_recording()
+                self._effector.activate(data)
         if event == "effect_activated":
             logger.log_event("effect_activated", data.get("meta_information", None))
             if self._recorder is not None:

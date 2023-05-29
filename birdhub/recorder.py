@@ -1,10 +1,12 @@
 """Collection of recorder objects"""
-from abc import ABC, abstractmethod
 import os
 from datetime import datetime
+import cv2
 from typing import List, Tuple, Optional
+from PIL import Image, ImageDraw, ImageFont
 from birdhub.video import Stream, VideoWriter
 from birdhub.orchestration import Mediator
+from birdhub.detection import Detection
 from birdhub.logging import logger
 
 class Recorder():
@@ -24,12 +26,6 @@ class Recorder():
 
     def add_event_manager(self, event_manager: Mediator):
         self._event_manager = event_manager
-
-    def register_start_recording(self):
-        pass
-
-    def register_stop_recording(self):
-        pass
 
     def register_frame(self):
         pass
@@ -58,24 +54,53 @@ class EventRecorder(Recorder):
         self._slack = slack
         self._look_back_frames = []
         self._look_back_frames_limit = look_back_frames
-        self._recording = False
         self._writer = None
+        self._detection_writer = None
         self._stop_recording_in = 0
     
+    def _get_detection_output_file(self):
+        return os.path.join(self._outputDir, f"{self._get_timestamp()}_detections.avi")
+    
+    def _create_detection_frames(self, detection: Detection):
+        images = detection.get("source_images")
+        boxes_list = detection.get("bboxes")
+        labels_list = detection.get("labels")
+        if images is None or boxes_list is None or labels_list is None:
+            return None
+        output_images = []
+        for image, boxes, labels in zip(images, boxes_list, labels_list):
+            for box, label in zip(boxes, labels):
+                x1, y1, x2, y2 = [int(i) for i in box]
+                # Draw the bounding box with red lines
+                cv2.rectangle(image, (x1, y1), (x2, y2), (255, 0, 0), 5)
+                cv2.putText(image,label, (x1,y2 + 15), cv2.FONT_HERSHEY_SIMPLEX, 1, 255)
+                output_images.append(image)
+        return output_images
+
     def register_frame(self, frame):
         self._look_back_frames.append(frame)
-        if len(self._look_back_frames) < self._look_back_frames_limit:
-            self._look_back_frames = self._look_back_frames[-self._activation_frames:]
-        if self._recording:
-            self._writer.write(frame)
-        if not self._recording and self._stop_recording_in > 0:
+        if len(self._look_back_frames) > self._look_back_frames_limit:
+            self._look_back_frames = self._look_back_frames[-self._look_back_frames_limit:]
+        if self._stop_recording_in > 0:
             self._writer.write(frame)
             self._stop_recording_in -= 1
+        elif self._writer is not None:
+            logger.log_event("recording_stopped", "event recording stopped")
+            self._writer.release()
+            self._writer = None
+            self._detection_writer.release()
+            self._detection_writer = None
     
-    def register_start_recording(self, detection_data: object):
+    def register_detection(self, detection_data):
         if self._writer:
-            self.register_detection(detection_data)
+            self._stop_recording_in = self._slack
+            detection_frames = self._create_detection_frames(detection_data)
+            if detection_frames is not None:
+                for detection_frame in detection_frames:
+                    self._detection_writer.write(detection_frame)
+
         else:
+            logger.log_event("recording_started", "event recording started")
             self._writer = VideoWriter(self._get_recording_output_file(), self._fps, self._frame_size)
             self._stop_recording_in = self._slack
             self._recording = True
@@ -83,14 +108,12 @@ class EventRecorder(Recorder):
             for frame in self._look_back_frames:
                 self._writer.write(frame)
             self._look_back_frames = []
-            # TODO: wirte detection data to a file
-    
-    def register_detection(self, detection_data):
-        self._stop_recording_in = self._slack
-        # TODO: write detection data to a file
-    
-    def register_stop_recording(self):
-        self._recording = False
+            # write detection data to a file
+            self._detection_writer = VideoWriter(self._get_detection_output_file(), self._fps, self._frame_size)
+            detection_frames = self._create_detection_frames(detection_data)
+            if detection_frames is not None:
+                for detection_frame in detection_frames:
+                    self._detection_writer.write(detection_frame)
 
 
 # class MotionRecoder(Recorder):

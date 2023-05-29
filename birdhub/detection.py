@@ -1,6 +1,7 @@
 """Classes for motion detection"""
 import cv2
 from abc import ABC, abstractmethod
+from typing import List, Optional, Dict
 import numpy as np
 import torch
 import numpy as np
@@ -9,6 +10,31 @@ from yolov5.models.common import DetectMultiBackend
 from yolov5.utils.general import non_max_suppression
 from yolov5.utils.torch_utils import select_device
 from birdhub.orchestration import Mediator
+
+class Detection:
+    """Class to represent a detection"""
+
+    def __init__(self, labels:Optional[List[List[str]]]=None,
+                       confidences:Optional[List[List[float]]]=None,
+                       bboxes:Optional[List[List[np.ndarray]]]=None,
+                       source_images:Optional[List[np.ndarray]]=None,
+                       meta_information:Dict[str, str]=None):
+        self.labels = labels
+        self.confidences = confidences
+        self.bboxes = bboxes
+        self.source_images = source_images
+        self.meta_information = meta_information
+
+    def __str__(self):
+        return f"Detection(label={self.label}, confidence={self.confidence}, bbox={self.bbox}, meta_information={self.meta_information})"
+
+    def get(self, key, default=None):
+        if key not in self.__dict__:
+            return default
+        return getattr(self, key)
+
+    def __repr__(self):
+        return self.__str__()
 
 
 class Detector(ABC):
@@ -20,22 +46,24 @@ class Detector(ABC):
     def add_event_manager(self, event_manager: Mediator):
         self._event_manager = event_manager
 
-
-    # TODO: unify detection output format
     @abstractmethod
-    def detect(self, frame):
+    def detect(self, frame) -> Detection:
         raise NotImplementedError
 
 
 class SimpleMotionDetector(Detector):
     """Simple motion detector that compares the current frame with the previous frame"""
 
-    def __init__(self, threshold=20, blur=21, dilation_kernel=np.ones((5,5)), threshold_area=50):
+    def __init__(self, threshold=20, blur=21, dilation_kernel=np.ones((5,5)), threshold_area=50, activation_frames:int=5):
+        super().__init__()
         self._threshold = threshold
         self._blur = blur
         self._dilation_kernel = dilation_kernel
         self._threshold_area = threshold_area
         self._previous_frame = None
+        self._activation_frames = activation_frames
+        self._motion_frames = 0
+        self._detections = []
 
     def _preprocess_image(self, image):
         """Preprocess the image"""
@@ -49,39 +77,46 @@ class SimpleMotionDetector(Detector):
 
     def detect(self, frame):
         """Detect motion between the current frame and the previous frame"""
-        # guard against None
-        if frame is None or self._previous_frame is None:
+        # add first frame
+        if self._previous_frame is None:
             self._previous_frame = frame
             return []
         # Convert the frames to grayscale
         prep_frame, prep_previous = self._preprocess_image(frame), self._preprocess_image(self._previous_frame)
-
         # Calculate the absolute difference between the current frame and the previous frame
         frame_delta = cv2.absdiff(prep_previous, prep_frame)
-
         # Apply a threshold to the frame delta
         _, threshold = cv2.threshold(frame_delta, self._threshold, 255, cv2.THRESH_BINARY)
-
         # Dilate the thresholded image to fill in holes
         dilated = cv2.dilate(threshold, self._dilation_kernel, iterations=2)
-
         # Find contours on the dilated image
         contours, _ = cv2.findContours(dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
         rects = []
-
         for contour in contours:
             if cv2.contourArea(contour) < self._threshold_area:
                 # too small: skip!
                 continue
             (x, y, w, h) = cv2.boundingRect(contour)
             rects.append([x, y, x + w, y + h])
-
+        # check whether motion is detected
+        if len(rects) > 0 and self._motion_frames < self._activation_frames:
+            self._motion_frames += 1
+            self._detections.append((rects, frame.copy()))
+        if len(rects) > 0 and self._motion_frames >= self._activation_frames:
+            self._detections.append((rects, frame.copy()))
+            bboxes = [i[0] for i in self._detections]
+            source_images = [i[1] for i in self._detections]
+            labels = [['motion'] * len(rect) for rect in self._detections]
+            self._event_manager.notify("detection",
+                                      Detection(bboxes=bboxes, labels=labels,
+                                                source_images=source_images, meta_information="Motion detected!"))
+            self._motion_frames = 0
+            self._detections = []
+        if len(rects) == 0 and self._motion_frames > 0:
+            self._motion_frames = 0
+            self._detections = []
         # Update the previous frame
         self._previous_frame = frame
-        # Return the rectangles
-        return rects
-
 
 class BirdDetectorYolov5(Detector):
 
