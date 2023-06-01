@@ -11,14 +11,24 @@ class Mediator(ABC):
     mediator about various events. The Mediator may react to these events and
     pass the execution to other components.
     """
+
+    @abstractmethod
+    def log(self, event: str, message: Optional[str] = None) -> None:
+        pass
+
     @abstractmethod
     def notify(self, event: str, data: object) -> None:
         pass
 
 
 class VideoEventManager(Mediator):
-    
-    def __init__(self, stream: 'Stream', recorder: Optional['Recorder']=None, detector: Optional['Detector']=None, effector:Optional['Effector']=None) -> None:
+    def __init__(
+        self,
+        stream: "Stream",
+        recorder: Optional["Recorder"] = None,
+        detector: Optional["Detector"] = None,
+        effector: Optional["Effector"] = None,
+    ) -> None:
         self._stream = stream
         self._recorder = recorder
         self._detector = detector
@@ -32,13 +42,17 @@ class VideoEventManager(Mediator):
         if self._effector is not None:
             self._effector.add_event_manager(self)
 
+    def log(self, event: str, message: Optional[str] = None) -> None:
+        logger.log_event(event, message)
 
     def notify(self, event: str, data: object) -> None:
         if event == "video_frame":
             if self._detector is not None:
                 self._detector.detect(data)
             if self._recorder is not None:
-                self._recorder.register_frame(data) # This is needed for lookback recording
+                self._recorder.register_frame(
+                    data
+                )  # This is needed for lookback recording
         if event == "detection":
             logger.log_event("detection", data.get("meta_information", None))
             if self._recorder is not None:

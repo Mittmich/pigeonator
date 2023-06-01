@@ -61,7 +61,7 @@ class EventRecorder(Recorder):
     def _get_detection_output_file(self):
         return os.path.join(self._outputDir, f"{self._get_timestamp()}_detections.avi")
     
-    def _create_detection_frames(self, detection: Detection):
+    def create_detection_frames(self, detection: Detection):
         images = detection.get("source_images")
         boxes_list = detection.get("bboxes")
         labels_list = detection.get("labels")
@@ -77,30 +77,43 @@ class EventRecorder(Recorder):
                 output_images.append(image)
         return output_images
 
-    def register_frame(self, frame):
+    def _update_lookback_frames(self, frame):
         self._look_back_frames.append(frame)
         if len(self._look_back_frames) > self._look_back_frames_limit:
             self._look_back_frames = self._look_back_frames[-self._look_back_frames_limit:]
+
+
+    def _destroy_writers(self):
+        if self._writer:
+            self._writer.release()
+            self._writer = None
+        if self._detection_writer:
+            self._detection_writer.release()
+            self._detection_writer = None
+
+    def _write_detections(self, detection_data):
+        if self._detection_writer is None:
+            self._detection_writer = VideoWriter(self._get_detection_output_file(), self._fps, self._frame_size)
+        detection_frames = self.create_detection_frames(detection_data)
+        if detection_frames is not None:
+            for detection_frame in detection_frames:
+                self._detection_writer.write(detection_frame)
+
+    def register_frame(self, frame):
+        self._update_lookback_frames(frame)
         if self._stop_recording_in > 0:
             self._writer.write(frame)
             self._stop_recording_in -= 1
         elif self._writer is not None:
-            logger.log_event("recording_stopped", "event recording stopped")
-            self._writer.release()
-            self._writer = None
-            self._detection_writer.release()
-            self._detection_writer = None
+            self._event_manager.log("recording_stopped", "event recording stopped")
+            self._destroy_writers()
     
     def register_detection(self, detection_data):
         if self._writer:
             self._stop_recording_in = self._slack
-            detection_frames = self._create_detection_frames(detection_data)
-            if detection_frames is not None:
-                for detection_frame in detection_frames:
-                    self._detection_writer.write(detection_frame)
-
+            self._write_detections(detection_data)
         else:
-            logger.log_event("recording_started", "event recording started")
+            self._event_manager.log("recording_started", "event recording started")
             self._writer = VideoWriter(self._get_recording_output_file(), self._fps, self._frame_size)
             self._stop_recording_in = self._slack
             self._recording = True
@@ -109,63 +122,4 @@ class EventRecorder(Recorder):
                 self._writer.write(frame)
             self._look_back_frames = []
             # write detection data to a file
-            self._detection_writer = VideoWriter(self._get_detection_output_file(), self._fps, self._frame_size)
-            detection_frames = self._create_detection_frames(detection_data)
-            if detection_frames is not None:
-                for detection_frame in detection_frames:
-                    self._detection_writer.write(detection_frame)
-
-
-# class MotionRecoder(Recorder):
-
-#     def __init__(self, stream_url: str, motion_detector: MotionDetector, slack:int=100, activation_frames:int=3) -> None:
-#         self._stream_url = stream_url
-#         self._detector = motion_detector
-#         self._slack = slack
-#         self._activation_frames = activation_frames
-#         self._previous_frame = None
-#         self._stop_recording_in = 0
-#         self._motion_frames = 0
-#         self._look_back_frames = []
-#         self._writer = None
-
-#     def _initialize_video_writer(self, outputDir, fps, frameSize):
-#         logger.log_event("motion_detected","Motion detected")
-#         output_file = os.path.join(outputDir, f"{self._get_timestamp()}.avi")
-#         self._writer = VideoWriter(output_file, fps, frameSize)
-#         for look_back_frame in self._look_back_frames:
-#             self._writer.write(look_back_frame)
-    
-#     def _destroy_video_writer(self):
-#         if self._writer is not None:
-#             logger.log_event("recording_stopped","Recording stopped")
-#             self._motion_frames = 0
-#             self._writer.release()
-#             self._writer = None
-
-    
-#     def record(self, outputDir: str, fps: int = 10) -> None:
-#         with Stream(self._stream_url) as stream:
-#             logger.log_event("recording_init",f"Recording to {outputDir}")
-#             for frame in stream:
-#                 self._look_back_frames.append(frame)
-#                 rect = self._detector.detect(frame, self._previous_frame)
-#                 if rect and self._writer is None:
-#                     if self._motion_frames < self._activation_frames:
-#                         self._motion_frames += 1
-#                     else:
-#                         self._initialize_video_writer( outputDir, fps, stream.frameSize)
-#                 if rect and self._writer is not None:
-#                     self._stop_recording_in = self._slack
-#                 if not rect and self._writer is not None:
-#                     self._stop_recording_in -= 1
-#                 if not rect and self._writer is None:
-#                     self._motion_frames = 0
-#                 # write frame to file if needed
-#                 if self._stop_recording_in > 0:
-#                     self._writer.write(frame)
-#                 else:
-#                     self._destroy_video_writer()
-#                 self._previous_frame = frame
-#                 if len(self._look_back_frames) > self._activation_frames:
-#                     self._look_back_frames = self._look_back_frames[-self._activation_frames:]
+            self._write_detections(detection_data)

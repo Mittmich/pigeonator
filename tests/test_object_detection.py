@@ -1,4 +1,4 @@
-from birdhub.object_dection import SingleClassImageSequence
+from birdhub.detection import SingleClassImageSequence
 
 def test_add_detections():
     seq = SingleClassImageSequence(minimum_number_detections=5)
