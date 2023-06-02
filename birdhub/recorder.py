@@ -98,11 +98,8 @@ class EventRecorder(Recorder):
             )
         return image
 
-    def create_detection_frames(self, detection: Union[Detection, List[Detection]]) -> List[np.ndarray]:
-        if isinstance(detection, Detection):
-            return [self._create_detection_frame(detection)]
-        else:
-            return [self._create_detection_frame(d) for d in detection]
+    def create_detection_frames(self, detections: List[Detection]) -> List[np.ndarray]:
+        return [self._create_detection_frame(d) for d in detections]
 
     def _update_lookback_frames(self, frame):
         self._look_back_frames.append(frame)

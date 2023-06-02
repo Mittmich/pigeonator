@@ -1,7 +1,7 @@
 """Classes for motion detection"""
 import cv2
 from abc import ABC, abstractmethod
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Union
 import numpy as np
 import torch
 import numpy as np
@@ -33,7 +33,7 @@ class Detection:
         setattr(self, key, value)
 
     def get(self, key, default=None):
-        if key not in self.__dict__:
+        if key not in self.__dict__ or getattr(self, key) is None:
             return default
         return getattr(self, key)
 
@@ -51,7 +51,7 @@ class Detector(ABC):
         self._event_manager = event_manager
 
     @abstractmethod
-    def detect(self, frame: np.ndarray) -> Detection:
+    def detect(self, frame: np.ndarray) -> Optional[List[Detection]]:
         raise NotImplementedError
 
 
@@ -84,15 +84,16 @@ class SimpleMotionDetector(Detector):
         if len(rects) > 0:
             detection.set("labels", ["motion"]*len(rects))
             detection.set("bboxes", rects)
+            detection.set('meta_information', "motion detected")
         self._detections.append(detection)
 
-    def detect(self, frame: np.ndarray) -> Detection:
+    def detect(self, frame: np.ndarray) -> Optional[List[Detection]]:
         """Detect motion between the current frame and the previous frame"""
-        detection = Detection(source_image=frame)
+        detection = Detection(source_image=frame.copy())
         # add first frame
         if self._previous_frame is None:
             self._previous_frame = frame
-            return detection
+            return None
         # Convert the frames to grayscale
         prep_frame, prep_previous = self._preprocess_image(frame), self._preprocess_image(self._previous_frame)
         # Calculate the absolute difference between the current frame and the previous frame
@@ -120,12 +121,13 @@ class SimpleMotionDetector(Detector):
                 self._event_manager.notify("detection", self._detections)
             self._motion_frames = 0
             self._detections = []
+            return self._detections
         if len(rects) == 0 and self._motion_frames > 0:
             self._motion_frames = 0
             self._detections = []
         # Update the previous frame
         self._previous_frame = frame
-        return detection
+        return None
 
 # Adjust this to detector interface
 class BirdDetectorYolov5(Detector):
@@ -196,8 +198,6 @@ class BirdDetectorYolov5(Detector):
         image.show()
 
 
-
-# TODO: adjust single this to conform to the detector interface
 class SingleClassImageSequence(Detector):
     """Accumulates object predictions and implements functionality to
     determine to most likely class of the object in the sequence.
@@ -212,27 +212,46 @@ class SingleClassImageSequence(Detector):
 
 
     def __init__(self, detector: Detector, minimum_number_detections:int=5) -> None:
-        self._detections = {}
+        super().__init__()
+        self._detections = []
+        self._object_detections = {}
         self._number_detections = 0
         self._minimum_number_detections = minimum_number_detections
+        self._detector = detector
     
 
-    def detect(self, frame: np.ndarray) -> Detection:
-        detection = self._detector.detect(frame)
-        objects, confidences = detection.get("labels", default=[]), detection.get("confidences", default=[])
-        for obj, conf in zip(objects, confidences):
-            self._number_detections += 1
-            if obj not in self._detections:
-                self._detections[obj] = conf
-            self._detections[obj] = self._detections[obj] + conf
+    def _accumulate_detections(self, detections: List[Detection]):
+        # extend detections
+        for detection in detections:
+            objects, confidences = detection.get("labels", default=[]), detection.get("confidences", default=[])
+            for obj, conf in zip(objects, confidences):
+                self._number_detections += 1
+                if obj not in self._object_detections:
+                    self._object_detections[obj] = conf
+                self._object_detections[obj] = self._object_detections[obj] + conf
+        self._detections.extend(detections)
 
+    def _blank_detections(self):
+        self._detections = []
 
-    def add_detections(self, objects, confidences):
-        for obj, conf in zip(objects, confidences):
-            self._number_detections += 1
-            if obj not in self._detections:
-                self._detections[obj] = conf
-            self._detections[obj] = self._detections[obj] + conf
+    def _rewrite_to_consensus(self):
+        # get most likely object
+        most_likely_object = self._get_most_likely_object()
+        for detection in self._detections:
+            meta = detection.get("meta_information", {})
+            meta["most_likely_object"] = most_likely_object
+            detection.set("meta_information", meta)
+
+    def detect(self, frame: np.ndarray) -> Optional[List[Detection]]:
+        # accumulate detections
+        self._accumulate_detections(self._detector.detect(frame))
+        # determine if we have reached consensus
+        if self._has_reached_consensus():
+            self._rewrite_to_consensus()
+            if self._event_manager is not None:
+                self._event_manager.notify("detection", self._detections)
+            self._blank_detections()
+            return self._detections
     
     def _has_reached_consensus(self):
         return self._number_detections >= self._minimum_number_detections
