@@ -1,7 +1,7 @@
 """Classes for motion detection"""
 import cv2
 from abc import ABC, abstractmethod
-from typing import List, Optional, Dict, Union
+from typing import List, Optional, Dict, Union, Tuple
 import numpy as np
 import torch
 import numpy as np
@@ -135,10 +135,11 @@ class SimpleMotionDetector(Detector):
 class BirdDetectorYolov5(Detector):
 
     def __init__(self,
-                 model_path,
-                 image_size=(640,640),
-                 confidence_threshold=0.25,
-                 iou_threhsold=0.45) -> None:
+                 model_path:str,
+                 image_size:Tuple[int]=(640,640),
+                 confidence_threshold:float=0.25,
+                 iou_threhsold:float=0.45) -> None:
+        super().__init__()
         # Load model
         self._device = select_device('')
         self._model = self._load_model(model_path)
@@ -164,7 +165,7 @@ class BirdDetectorYolov5(Detector):
     def _get_boxes(self, prediction):
         return prediction[:, :4].numpy().tolist()
 
-    def detect(self, frame):
+    def detect(self, frame) -> Optional[List[Detection]]:
         # TODO: resize if needed
         # assumes im is in opencv BGR format
         im = frame.transpose(2,0,1)[::-1] # BGR to RGB
@@ -183,7 +184,11 @@ class BirdDetectorYolov5(Detector):
         birds = self._extract_birds_from_prediction(stacked)
         confidences = self._get_confidences(stacked)
         boxes = self._get_boxes(stacked)
-        return birds, confidences, boxes, stacked
+        if len (birds) > 0:
+            detection = [Detection(source_image=frame.copy(), labels=birds, confidences=confidences, bboxes=boxes, meta_information={"type": "bird detected"})]
+            if self._event_manager is not None:
+                self._event_manager.notify("detection", detection)
+            return detection
 
     @staticmethod
     def show_bbox(image, boxes, labels):
