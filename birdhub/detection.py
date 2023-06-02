@@ -14,19 +14,23 @@ from birdhub.orchestration import Mediator
 class Detection:
     """Class to represent a detection"""
 
-    def __init__(self, labels:Optional[List[List[str]]]=None,
-                       confidences:Optional[List[List[float]]]=None,
-                       bboxes:Optional[List[List[np.ndarray]]]=None,
-                       source_images:Optional[List[np.ndarray]]=None,
+    def __init__(self, 
+                       source_image:np.ndarray,
+                       labels:Optional[List[str]]=None,
+                       confidences:Optional[List[float]]=None,
+                       bboxes:Optional[List[np.ndarray]]=None,
                        meta_information:Dict[str, str]=None):
+        self.source_image = source_image
         self.labels = labels
         self.confidences = confidences
         self.bboxes = bboxes
-        self.source_images = source_images
         self.meta_information = meta_information
 
     def __str__(self):
-        return f"Detection(label={self.label}, confidence={self.confidence}, bbox={self.bbox}, meta_information={self.meta_information})"
+        return f"Detection(label={self.labels}, confidence={self.confidences}, bbox={self.bboxes}, meta_information={self.meta_information})"
+
+    def set(self, key, value):
+        setattr(self, key, value)
 
     def get(self, key, default=None):
         if key not in self.__dict__:
@@ -47,7 +51,7 @@ class Detector(ABC):
         self._event_manager = event_manager
 
     @abstractmethod
-    def detect(self, frame) -> Detection:
+    def detect(self, frame: np.ndarray) -> Detection:
         raise NotImplementedError
 
 
@@ -75,12 +79,20 @@ class SimpleMotionDetector(Detector):
 
         return blur
 
-    def detect(self, frame):
+    def _update_detections(self, detection: Detection, rects: List[np.ndarray]):
+        """Update the detection with the given rects if they are not empty"""
+        if len(rects) > 0:
+            detection.set("labels", ["motion"]*len(rects))
+            detection.set("bboxes", rects)
+        self._detections.append(detection)
+
+    def detect(self, frame: np.ndarray) -> Detection:
         """Detect motion between the current frame and the previous frame"""
+        detection = Detection(source_image=frame)
         # add first frame
         if self._previous_frame is None:
             self._previous_frame = frame
-            return []
+            return detection
         # Convert the frames to grayscale
         prep_frame, prep_previous = self._preprocess_image(frame), self._preprocess_image(self._previous_frame)
         # Calculate the absolute difference between the current frame and the previous frame
@@ -98,18 +110,14 @@ class SimpleMotionDetector(Detector):
                 continue
             (x, y, w, h) = cv2.boundingRect(contour)
             rects.append([x, y, x + w, y + h])
+        # update detections
+        self._update_detections(detection, rects)
         # check whether motion is detected
         if len(rects) > 0 and self._motion_frames < self._activation_frames:
             self._motion_frames += 1
-            self._detections.append((rects, frame.copy()))
         if len(rects) > 0 and self._motion_frames >= self._activation_frames:
-            self._detections.append((rects, frame.copy()))
-            bboxes = [i[0] for i in self._detections]
-            source_images = [i[1] for i in self._detections]
-            labels = [['motion'] * len(rect) for rect in self._detections]
-            self._event_manager.notify("detection",
-                                      Detection(bboxes=bboxes, labels=labels,
-                                                source_images=source_images, meta_information="Motion detected!"))
+            if self._event_manager is not None:
+                self._event_manager.notify("detection", self._detections)
             self._motion_frames = 0
             self._detections = []
         if len(rects) == 0 and self._motion_frames > 0:
@@ -117,7 +125,9 @@ class SimpleMotionDetector(Detector):
             self._detections = []
         # Update the previous frame
         self._previous_frame = frame
+        return detection
 
+# Adjust this to detector interface
 class BirdDetectorYolov5(Detector):
 
     def __init__(self,
@@ -188,7 +198,7 @@ class BirdDetectorYolov5(Detector):
 
 
 # TODO: adjust single this to conform to the detector interface
-class SingleClassImageSequence():
+class SingleClassImageSequence(Detector):
     """Accumulates object predictions and implements functionality to
     determine to most likely class of the object in the sequence.
     When there are multiple objects in the seuqence, the class with the
@@ -201,11 +211,22 @@ class SingleClassImageSequence():
     """
 
 
-    def __init__(self, minimum_number_detections:int=5, ) -> None:
+    def __init__(self, detector: Detector, minimum_number_detections:int=5) -> None:
         self._detections = {}
         self._number_detections = 0
         self._minimum_number_detections = minimum_number_detections
     
+
+    def detect(self, frame: np.ndarray) -> Detection:
+        detection = self._detector.detect(frame)
+        objects, confidences = detection.get("labels", default=[]), detection.get("confidences", default=[])
+        for obj, conf in zip(objects, confidences):
+            self._number_detections += 1
+            if obj not in self._detections:
+                self._detections[obj] = conf
+            self._detections[obj] = self._detections[obj] + conf
+
+
     def add_detections(self, objects, confidences):
         for obj, conf in zip(objects, confidences):
             self._number_detections += 1
@@ -213,10 +234,10 @@ class SingleClassImageSequence():
                 self._detections[obj] = conf
             self._detections[obj] = self._detections[obj] + conf
     
-    def has_reached_consensus(self):
+    def _has_reached_consensus(self):
         return self._number_detections >= self._minimum_number_detections
     
-    def get_most_likely_object(self):
+    def _get_most_likely_object(self):
         if self._number_detections < self._minimum_number_detections:
             return None
         return max(self._detections, key=self._detections.get)

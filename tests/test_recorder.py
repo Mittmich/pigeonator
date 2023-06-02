@@ -15,7 +15,7 @@ def random_array():
 
 @pytest.fixture
 def example_detection(empty_array):
-    return Detection(['bird'], [0.9], [[(0, 0, 100, 100)]], [empty_array])
+    return Detection(source_image=empty_array, labels=['bird'], confidences=[0.9], bboxes=[(0, 0, 100, 100)])
 
 @pytest.fixture
 def mock_writer():
@@ -108,75 +108,3 @@ def test_Event_Recorder_records_look_back_frames_correctly(empty_array, random_a
     # check that the first 5 frames are written
     for actual, expected in zip(mock_writer[1].write.mock_calls,frames):
         np.testing.assert_array_equal(actual.args[0], expected)
-
-
-# def test_MotionRecoder_does_not_record_if_no_motion(no_motion_stream):
-#     with patch('birdhub.recorder.Stream') as MockStream, \
-#          patch('birdhub.recorder.VideoWriter') as MockVideoWriter:
-#         MockStream.return_value = no_motion_stream
-#         writer = MagicMock()
-#         MockVideoWriter.return_value = writer
-#         mr = MotionRecoder('http://example.com', SimpleMotionDetector(), slack=100, activation_frames=10)
-#         mr.record('/path/to/output/dir', fps=10)
-#         MockStream.assert_called_once_with('http://example.com')
-#         writer.write.assert_not_called()
-
-# def test_MotionRecoder_records_motion(single_frame_motion_stream):
-#     with patch('birdhub.recorder.Stream') as MockStream, \
-#          patch('birdhub.recorder.VideoWriter') as MockVideoWriter:
-#         MockStream.return_value = single_frame_motion_stream
-#         writer = MagicMock()
-#         MockVideoWriter.return_value = writer
-#         mr = MotionRecoder('http://example.com', SimpleMotionDetector(), slack=100, activation_frames=0)
-#         mr.record('/path/to/output/dir', fps=10)
-#         MockStream.assert_called_once_with('http://example.com')
-#         writer.write.assert_called()
-#         assert writer.write.call_count == 3
-
-
-# def test_MotionRecoder_does_not_record_below_activation_frames(single_frame_motion_stream):
-#     with patch('birdhub.recorder.Stream') as MockStream, \
-#          patch('birdhub.recorder.VideoWriter') as MockVideoWriter:
-#         MockStream.return_value = single_frame_motion_stream
-#         mr = MotionRecoder('http://example.com', SimpleMotionDetector(), slack=100, activation_frames=1)
-#         mr.record('/path/to/output/dir', fps=10)
-#         MockStream.assert_called_once_with('http://example.com')
-#         MockVideoWriter.assert_not_called()
-
-# def test_MotionRecorder_does_not_record_below_activation_frames_multiple_sequences(multiple_motion_events_stream):
-#     with patch('birdhub.recorder.Stream') as MockStream, \
-#          patch('birdhub.recorder.VideoWriter') as MockVideoWriter:
-#         MockStream.return_value = multiple_motion_events_stream
-#         writer = MagicMock()
-#         MockVideoWriter.return_value = writer
-#         mr = MotionRecoder('http://example.com', SimpleMotionDetector(), slack=5, activation_frames=3)
-#         mr.record('/path/to/output/dir', fps=10)
-#         MockStream.assert_called_once_with('http://example.com')
-#         writer.write.assert_not_called()
-
-# def test_MotionRecorder_respects_activation_frames_multiple_sequences(multiple_motion_events_stream):
-#     with patch('birdhub.recorder.Stream') as MockStream, \
-#          patch('birdhub.recorder.VideoWriter') as MockVideoWriter:
-#         MockStream.return_value = multiple_motion_events_stream
-#         writer = MagicMock()
-#         MockVideoWriter.return_value = writer
-#         mr = MotionRecoder('http://example.com', SimpleMotionDetector(), slack=2, activation_frames=2)
-#         mr.record('/path/to/output/dir', fps=10)
-#         MockStream.assert_called_once_with('http://example.com')
-#         writer.write.assert_called()
-#         assert writer.write.call_count == 5
-
-
-# def test_MotionRecoder_respects_slack(long_single_frame_motion_stream, empty_array):
-#     with patch('birdhub.recorder.Stream') as MockStream, \
-#          patch('birdhub.recorder.VideoWriter') as MockVideoWriter:
-#         MockStream.return_value = long_single_frame_motion_stream
-#         writer = MagicMock()
-#         MockVideoWriter.return_value = writer
-#         mr = MotionRecoder('http://example.com', SimpleMotionDetector(), slack=10, activation_frames=0)
-#         mr.record('/path/to/output/dir', fps=10)
-#         MockStream.assert_called_once_with('http://example.com')
-#         writer.write.assert_called()
-#         assert writer.write.call_count == 12
-#         # ensure lockbackframes have been written
-#         writer.write.assert_any_call(empty_array)

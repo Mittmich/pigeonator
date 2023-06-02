@@ -2,7 +2,8 @@
 import os
 from datetime import datetime
 import cv2
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Union
+import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 from birdhub.video import Stream, VideoWriter
 from birdhub.orchestration import Mediator
@@ -84,23 +85,24 @@ class EventRecorder(Recorder):
     def _get_detection_output_file(self):
         return os.path.join(self._outputDir, f"{self._get_timestamp()}_detections.avi")
 
-    def create_detection_frames(self, detection: Detection):
-        images = detection.get("source_images")
-        boxes_list = detection.get("bboxes")
-        labels_list = detection.get("labels")
-        if images is None or boxes_list is None or labels_list is None:
-            return None
-        output_images = []
-        for image, boxes, labels in zip(images, boxes_list, labels_list):
-            for box, label in zip(boxes, labels):
-                x1, y1, x2, y2 = [int(i) for i in box]
-                # Draw the bounding box with red lines
-                cv2.rectangle(image, (x1, y1), (x2, y2), (255, 0, 0), 5)
-                cv2.putText(
-                    image, label, (x1, y2 + 15), cv2.FONT_HERSHEY_SIMPLEX, 1, 255
-                )
-                output_images.append(image)
-        return output_images
+    def _create_detection_frame(self, detection: Detection):
+        image = detection.get("source_image")
+        boxes = detection.get("bboxes", default=[])
+        labels = detection.get("labels", default=[])
+        for box, label in zip(boxes, labels):
+            x1, y1, x2, y2 = [int(i) for i in box]
+            # Draw the bounding box with red lines
+            cv2.rectangle(image, (x1, y1), (x2, y2), (255, 0, 0), 5)
+            cv2.putText(
+                image, label, (x1, y2 + 15), cv2.FONT_HERSHEY_SIMPLEX, 1, 255
+            )
+        return image
+
+    def create_detection_frames(self, detection: Union[Detection, List[Detection]]) -> List[np.ndarray]:
+        if isinstance(detection, Detection):
+            return [self._create_detection_frame(detection)]
+        else:
+            return [self._create_detection_frame(d) for d in detection]
 
     def _update_lookback_frames(self, frame):
         self._look_back_frames.append(frame)
