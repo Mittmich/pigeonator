@@ -18,6 +18,30 @@ def example_detection(empty_array):
     return Detection(['bird'], [0.9], [[(0, 0, 100, 100)]], [empty_array])
 
 @pytest.fixture
+def mock_writer():
+    writer = MagicMock()
+    MockVideoWriter = MagicMock()
+    MockVideoWriter.return_value = writer
+    return MockVideoWriter, writer
+
+@pytest.fixture
+def mock_detection_writer():
+    writer = MagicMock()
+    MockVideoWriter = MagicMock()
+    MockVideoWriter.return_value = writer
+    return MockVideoWriter, writer
+
+@pytest.fixture
+def mock_event_manager():
+    return MagicMock()
+
+@pytest.fixture
+def event_recorder(mock_writer, mock_detection_writer, mock_event_manager):
+    er = EventRecorder("output_dir", frame_size=(640, 480 ), fps=10, writer_factory=mock_writer[0], detection_writer_factory=mock_detection_writer[0])
+    er.add_event_manager(mock_event_manager)
+    return er
+
+@pytest.fixture
 def no_motion_stream(empty_array):
     stream = MagicMock()
     frameSequence = MagicMock()
@@ -54,53 +78,36 @@ def multiple_motion_events_stream(empty_array, random_array):
     return stream
 
 
-def test_ContinuousRecorder_records(empty_array):
-    with  patch('birdhub.recorder.VideoWriter') as MockVideoWriter:
-        writer = MagicMock()
-        MockVideoWriter.return_value = writer
-        cr = ContinuousRecorder("output_dir", frame_size=(640, 480 ), fps=10)
-        cr.register_frame(empty_array)
-        writer.write.assert_called_with(empty_array)
+def test_ContinuousRecorder_records(empty_array, mock_writer):
+    cr = ContinuousRecorder("output_dir", frame_size=(640, 480 ), fps=10, writer_factory=mock_writer[0])
+    cr.register_frame(empty_array)
+    mock_writer[1].write.assert_called_with(empty_array)
 
-def test_Event_Recorder_does_not_record_without_detection(empty_array):
-    with patch('birdhub.recorder.VideoWriter') as MockVideoWriter:
-        writer = MagicMock()
-        MockVideoWriter.return_value = writer
-        er = EventRecorder("output_dir", frame_size=(640, 480 ), fps=10)
-        er.register_frame(empty_array)
-        writer.write.assert_not_called()
+def test_Event_Recorder_does_not_record_without_detection(empty_array, mock_writer, mock_detection_writer, event_recorder):
+    event_recorder.register_frame(empty_array)
+    mock_writer[1].write.assert_not_called()
+    mock_detection_writer[1].write.assert_not_called()
 
-def test_Event_Recorder_records_after_detection(empty_array, example_detection):
-    with patch('birdhub.recorder.VideoWriter') as MockVideoWriter:
-        writer = MagicMock()
-        MockVideoWriter.return_value = writer
-        er = EventRecorder("output_dir", frame_size=(640, 480 ), fps=10)
-        mock_event_manager = MagicMock()
-        er.add_event_manager(mock_event_manager)
-        er.register_detection(example_detection)
-        er.register_frame(empty_array)
-        assert writer.write.call_count == 2
-        assert len(er.create_detection_frames(example_detection)) == 1
-        writer.write.assert_any_call(empty_array)
-        writer.write.assert_any_call(er.create_detection_frames(example_detection)[0])
+def test_Event_Recorder_records_after_detection(empty_array, example_detection, mock_writer, mock_detection_writer, event_recorder):
+        event_recorder.register_detection(example_detection)
+        event_recorder.register_frame(empty_array)
+        assert mock_writer[1].write.call_count == 1
+        assert mock_detection_writer[1].write.call_count == 1
+        assert len(event_recorder.create_detection_frames(example_detection)) == 1
+        mock_writer[1].write.assert_any_call(empty_array)
+        mock_detection_writer[1].write.assert_any_call(event_recorder.create_detection_frames(example_detection)[0])
 
-def test_Event_Recorder_records_look_back_frames_correctly(empty_array, random_array, example_detection):
-    with patch('birdhub.recorder.VideoWriter') as MockVideoWriter:
-        writer = MagicMock()
-        MockVideoWriter.return_value = writer
-        mock_event_manager = MagicMock()
-        er = EventRecorder("output_dir", frame_size=(640, 480 ), fps=10, look_back_frames=5)
-        er.add_event_manager(mock_event_manager)
-        frames = [empty_array] + 5 * [random_array]
-        # register first 5 frames
-        for frame in frames[:5]:
-            er.register_frame(frame)
-        # register first detection
-        er.register_detection(example_detection)
-        assert writer.write.call_count == 6
-        # check that the first 5 frames are written
-        for actual, expected in zip(writer.write.mock_calls,frames[:5]):
-            np.testing.assert_array_equal(actual.args[0], expected)
+def test_Event_Recorder_records_look_back_frames_correctly(empty_array, random_array, example_detection, mock_detection_writer, mock_writer, event_recorder):
+    frames = [empty_array] + [random_array]
+    # register first 5 frames
+    for frame in frames[:5]:
+        event_recorder.register_frame(frame)
+    # register first detection
+    event_recorder.register_detection(example_detection)
+    assert mock_writer[1].write.call_count == 2
+    # check that the first 5 frames are written
+    for actual, expected in zip(mock_writer[1].write.mock_calls,frames):
+        np.testing.assert_array_equal(actual.args[0], expected)
 
 
 # def test_MotionRecoder_does_not_record_if_no_motion(no_motion_stream):
