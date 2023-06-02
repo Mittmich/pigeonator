@@ -250,8 +250,10 @@ class SingleClassImageSequence(Detector):
             self._rewrite_to_consensus()
             if self._event_manager is not None:
                 self._event_manager.notify("detection", self._detections)
+            # copy output
+            output = self._detections.copy()
             self._blank_detections()
-            return self._detections
+            return output
     
     def _has_reached_consensus(self):
         return self._number_detections >= self._minimum_number_detections
@@ -259,5 +261,5 @@ class SingleClassImageSequence(Detector):
     def _get_most_likely_object(self):
         if self._number_detections < self._minimum_number_detections:
             return None
-        return max(self._detections, key=self._detections.get)
+        return max(self._object_detections, key=self._object_detections.get)
         

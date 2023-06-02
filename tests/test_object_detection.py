@@ -1,26 +1,45 @@
-from birdhub.detection import SingleClassImageSequence
+import pytest
+from unittest.mock import patch, MagicMock
+from birdhub.detection import SingleClassImageSequence, Detection
+import numpy as np
 
-def test_add_detections():
-    seq = SingleClassImageSequence(minimum_number_detections=5)
-    seq.add_detections(["cat", "dog"], [0.2, 0.3])
-    assert seq.has_reached_consensus() == False
-    assert seq.get_most_likely_object() == None
+@pytest.fixture
+def small_detections(empty_array):
+    return [Detection(empty_array, ["cat", "dog"], [0.2, 0.3])]
 
-def test_has_reached_consensus():
-    seq = SingleClassImageSequence()
-    seq.add_detections(["cat", "dog", "bird", "elephant", "tiger"], [0.1, 0.2, 0.3, 0.4, 0.5])
-    assert seq.has_reached_consensus() == True
+@pytest.fixture
+def long_detections(empty_array):
+    return [Detection(empty_array, ["cat", "dog", "bird", "elephant", "tiger"], [0.1, 0.2, 0.3, 0.4, 0.5])]
 
-def test_get_most_likely_object():
-    seq = SingleClassImageSequence()
-    seq.add_detections(["cat", "dog"], [0.1, 0.2])
-    assert seq.get_most_likely_object() == None
-    seq.add_detections(["bird", "elephant", "tiger"], [0.3, 0.4, 0.5])
-    assert seq.get_most_likely_object() == "tiger"
+@pytest.fixture
+def small_sequence_detector(small_detections):
+    mock = MagicMock()
+    mock.detect.return_value = small_detections
+    return mock
 
-def test_multiple_detections():
-    seq = SingleClassImageSequence(minimum_number_detections=2)
-    seq.add_detections(["pigeon", "pigeon", "crow"], [0.2, 0.2, 0.5])
-    assert seq.get_most_likely_object() == "crow"
-    seq.add_detections(["pigeon", "pigeon"], [0.5, 0.5])
-    assert seq.get_most_likely_object() == "pigeon"
+@pytest.fixture
+def long_sequence_detector(long_detections):
+    mock = MagicMock()
+    mock.detect.return_value = long_detections
+    return mock
+
+@pytest.fixture
+def empty_array():
+    return np.zeros((640, 640, 3), dtype=np.uint8)
+
+@pytest.fixture
+def mock_event_manager():
+    return MagicMock()
+
+def test_single_class_image_sequence_obeys_threshold(small_sequence_detector, mock_event_manager, empty_array):
+    seq = SingleClassImageSequence(minimum_number_detections=5, detector=small_sequence_detector)
+    seq.add_event_manager(mock_event_manager)
+    assert seq.detect(empty_array) == None
+    mock_event_manager.notify.assert_not_called()
+
+def test_single_class_image_sequence_has_reached_consensus(long_sequence_detector, mock_event_manager, empty_array):
+    seq = SingleClassImageSequence(minimum_number_detections=5, detector=long_sequence_detector)
+    seq.add_event_manager(mock_event_manager)
+    result = seq.detect(empty_array)
+    assert result[0].get("meta_information") == {"most_likely_object": "tiger"}
+    mock_event_manager.notify.assert_called()
