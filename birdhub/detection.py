@@ -83,8 +83,9 @@ class SimpleMotionDetector(Detector):
         """Update the detection with the given rects if they are not empty"""
         if len(rects) > 0:
             detection.set("labels", ["motion"]*len(rects))
+            detection.set("confidences", [1.0]*len(rects))
             detection.set("bboxes", rects)
-            detection.set('meta_information', "motion detected")
+            detection.set('meta_information', {"type": "motion detected"})
         self._detections.append(detection)
 
     def detect(self, frame: np.ndarray) -> Optional[List[Detection]]:
@@ -120,8 +121,9 @@ class SimpleMotionDetector(Detector):
             if self._event_manager is not None:
                 self._event_manager.notify("detection", self._detections)
             self._motion_frames = 0
+            output = self._detections.copy()
             self._detections = []
-            return self._detections
+            return output
         if len(rects) == 0 and self._motion_frames > 0:
             self._motion_frames = 0
             self._detections = []
@@ -220,7 +222,9 @@ class SingleClassImageSequence(Detector):
         self._detector = detector
     
 
-    def _accumulate_detections(self, detections: List[Detection]):
+    def _accumulate_detections(self, detections: Optional[List[Detection]]):
+        if detections is None:
+            return
         # extend detections
         for detection in detections:
             objects, confidences = detection.get("labels", default=[]), detection.get("confidences", default=[])
@@ -246,12 +250,12 @@ class SingleClassImageSequence(Detector):
         # accumulate detections
         self._accumulate_detections(self._detector.detect(frame))
         # determine if we have reached consensus
-        if self._has_reached_consensus():
+        if self._has_reached_consensus() and len(self._detections) > 0:
             self._rewrite_to_consensus()
-            if self._event_manager is not None:
-                self._event_manager.notify("detection", self._detections)
             # copy output
             output = self._detections.copy()
+            if self._event_manager is not None:
+                self._event_manager.notify("detection", output)
             self._blank_detections()
             return output
     

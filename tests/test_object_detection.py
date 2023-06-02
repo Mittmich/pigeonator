@@ -4,23 +4,23 @@ from birdhub.detection import SingleClassImageSequence, Detection
 import numpy as np
 
 @pytest.fixture
-def small_detections(empty_array):
+def small_detection(empty_array):
     return [Detection(empty_array, ["cat", "dog"], [0.2, 0.3])]
 
 @pytest.fixture
-def long_detections(empty_array):
+def big_detection(empty_array):
     return [Detection(empty_array, ["cat", "dog", "bird", "elephant", "tiger"], [0.1, 0.2, 0.3, 0.4, 0.5])]
 
 @pytest.fixture
-def small_sequence_detector(small_detections):
+def small_sequence_detector(small_detection):
     mock = MagicMock()
-    mock.detect.return_value = small_detections
+    mock.detect.return_value = small_detection
     return mock
 
 @pytest.fixture
-def long_sequence_detector(long_detections):
+def long_sequence_detector(big_detection):
     mock = MagicMock()
-    mock.detect.return_value = long_detections
+    mock.detect.return_value = big_detection
     return mock
 
 @pytest.fixture

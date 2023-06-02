@@ -49,7 +49,8 @@ class VideoEventManager(Mediator):
         if event == "detection":
             self._detections_logged += 1
             if self._detections_logged % self._throttle_detection == 0:
-                logger.log_event(event, message + f" X {self._throttle_detection}")
+                message['accumulation_count'] = self._throttle_detection
+                logger.log_event(event, message)
         elif event == "recording_stopped":
             self._detections_logged = 0
             logger.log_event(event, message)
