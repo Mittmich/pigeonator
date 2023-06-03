@@ -2,6 +2,7 @@
 import cv2
 from abc import ABC, abstractmethod
 from typing import List, Optional, Dict, Union, Tuple
+from datetime import datetime
 import numpy as np
 import torch
 import numpy as np
@@ -10,24 +11,25 @@ from yolov5.models.common import DetectMultiBackend
 from yolov5.utils.general import non_max_suppression
 from yolov5.utils.torch_utils import select_device
 from birdhub.orchestration import Mediator
+from birdhub.video import Frame
 
 class Detection:
     """Class to represent a detection"""
 
     def __init__(self, 
-                       source_image:np.ndarray,
+                       frame_timestamp:datetime,
                        labels:Optional[List[str]]=None,
                        confidences:Optional[List[float]]=None,
                        bboxes:Optional[List[np.ndarray]]=None,
                        meta_information:Dict[str, str]=None):
-        self.source_image = source_image
+        self.frame_timestamp = frame_timestamp
         self.labels = labels
         self.confidences = confidences
         self.bboxes = bboxes
         self.meta_information = meta_information
 
     def __str__(self):
-        return f"Detection(label={self.labels}, confidence={self.confidences}, bbox={self.bboxes}, meta_information={self.meta_information})"
+        return f"Detection(timestamp={self.frame_timestamp}, labels={self.labels}, confidences={self.confidences}, meta_information={self.meta_information})"
 
     def set(self, key, value):
         setattr(self, key, value)
@@ -51,7 +53,7 @@ class Detector(ABC):
         self._event_manager = event_manager
 
     @abstractmethod
-    def detect(self, frame: np.ndarray) -> Optional[List[Detection]]:
+    def detect(self, frame: Frame) -> Optional[List[Detection]]:
         raise NotImplementedError
 
 
@@ -79,24 +81,25 @@ class SimpleMotionDetector(Detector):
 
         return blur
 
-    def _update_detections(self, detection: Detection, rects: List[np.ndarray]):
+    def _update_detections(self, frame: Frame, rects: List[np.ndarray]):
         """Update the detection with the given rects if they are not empty"""
         if len(rects) > 0:
-            detection.set("labels", ["motion"]*len(rects))
-            detection.set("confidences", [1.0]*len(rects))
-            detection.set("bboxes", rects)
-            detection.set('meta_information', {"type": "motion detected"})
-        self._detections.append(detection)
+            detection = Detection(
+                                  frame.timestamp,
+                                  labels=["motion"]*len(rects),
+                                  confidences=[1.0]*len(rects),
+                                  bboxes=rects,
+                                  meta_information={"type": "motion"})
+            self._detections.append(detection)
 
-    def detect(self, frame: np.ndarray) -> Optional[List[Detection]]:
+    def detect(self, frame: Frame) -> Optional[List[Detection]]:
         """Detect motion between the current frame and the previous frame"""
-        detection = Detection(source_image=frame.copy())
         # add first frame
         if self._previous_frame is None:
             self._previous_frame = frame
             return None
         # Convert the frames to grayscale
-        prep_frame, prep_previous = self._preprocess_image(frame), self._preprocess_image(self._previous_frame)
+        prep_frame, prep_previous = self._preprocess_image(frame.image), self._preprocess_image(self._previous_frame.image)
         # Calculate the absolute difference between the current frame and the previous frame
         frame_delta = cv2.absdiff(prep_previous, prep_frame)
         # Apply a threshold to the frame delta
@@ -113,7 +116,7 @@ class SimpleMotionDetector(Detector):
             (x, y, w, h) = cv2.boundingRect(contour)
             rects.append([x, y, x + w, y + h])
         # update detections
-        self._update_detections(detection, rects)
+        self._update_detections(frame, rects)
         # check whether motion is detected
         if len(rects) > 0 and self._motion_frames < self._activation_frames:
             self._motion_frames += 1

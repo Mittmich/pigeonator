@@ -1,7 +1,15 @@
 """A module to handle video streams and video files."""
 import cv2
+import numpy as np
+import datetime
 from birdhub.orchestration import Mediator
 from birdhub.logging import logger
+
+class Frame:
+    def __init__(self, image: np.ndarray, timestamp: datetime.datetime):
+        self.image = image
+        self.timestamp = timestamp
+
 
 class Stream:
 
@@ -12,16 +20,15 @@ class Stream:
 
     def get_frame(self):
         ret, frame = self.cap.read()
-        return frame
+        return Frame(frame, datetime.datetime.now())
 
     def add_event_manager(self, event_manager: Mediator):
         self._event_manager = event_manager
 
     def stream(self):
-        logger.log_event("stream_started", None)
+        self._event_manager.log("stream_started", None)
         while True:
-            ret, frame = self.cap.read()
-            self._event_manager.notify("video_frame", frame)
+            self._event_manager.notify("video_frame", self.get_frame())
     
     def __enter__(self):
         return self
