@@ -154,6 +154,8 @@ class EventRecorder(Recorder):
             self._stop_recording_in -= 1
         elif self._writer is not None:
             self._event_manager.log("recording_stopped", "event recording stopped")
+            # write detection buffer images (if any)
+            self._write_detections([])
             self._recording = False
             self._destroy_writers()
 
