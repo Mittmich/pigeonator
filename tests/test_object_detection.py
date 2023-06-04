@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import patch, MagicMock
-from birdhub.detection import SingleClassImageSequence, Detection
+from birdhub.detection import SingleClassSequenceDetector, Detection
 import numpy as np
 
 @pytest.fixture
@@ -31,14 +31,14 @@ def empty_array():
 def mock_event_manager():
     return MagicMock()
 
-def test_single_class_image_sequence_obeys_threshold(small_sequence_detector, mock_event_manager, empty_array):
-    seq = SingleClassImageSequence(minimum_number_detections=5, detector=small_sequence_detector)
+def test_single_class_sequence_detector_obeys_threshold(small_sequence_detector, mock_event_manager, empty_array):
+    seq = SingleClassSequenceDetector(minimum_number_detections=5, detector=small_sequence_detector)
     seq.add_event_manager(mock_event_manager)
     assert seq.detect(empty_array) == None
     mock_event_manager.notify.assert_not_called()
 
-def test_single_class_image_sequence_has_reached_consensus(long_sequence_detector, mock_event_manager, empty_array):
-    seq = SingleClassImageSequence(minimum_number_detections=5, detector=long_sequence_detector)
+def test_single_class_sequence_detector_has_reached_consensus(long_sequence_detector, mock_event_manager, empty_array):
+    seq = SingleClassSequenceDetector(minimum_number_detections=5, detector=long_sequence_detector)
     seq.add_event_manager(mock_event_manager)
     result = seq.detect(empty_array)
     assert result[0].get("meta_information") == {"most_likely_object": "tiger"}

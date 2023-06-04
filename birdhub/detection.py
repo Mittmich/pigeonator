@@ -208,7 +208,7 @@ class BirdDetectorYolov5(Detector):
         image.show()
 
 
-class SingleClassImageSequence(Detector):
+class SingleClassSequenceDetector(Detector):
     """Accumulates object predictions and implements functionality to
     determine to most likely class of the object in the sequence.
     When there are multiple objects in the seuqence, the class with the
@@ -274,4 +274,13 @@ class SingleClassImageSequence(Detector):
         if self._number_detections < self._minimum_number_detections:
             return None
         return max(self._object_detections, key=self._object_detections.get)
-        
+
+
+class MotionActivatedSingleClassDetector(SingleClassSequenceDetector):
+    """Detector that is a composition of a motion detector and another detctor.
+    The second detector only kicks in when motion is detected."""
+    
+    def __init__(self, detector: Detector, motion_detector: Detector, minimum_number_detections:int=5) -> None:
+        super().__init__(detector, minimum_number_detections)
+        self._motion_detector = motion_detector
+        self._motion_detected = False
