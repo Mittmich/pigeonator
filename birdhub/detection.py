@@ -156,7 +156,6 @@ class BirdDetectorYolov5(Detector):
         self._image_size = image_size
         self._confidence_threshold = confidence_threshold
         self._iou_threhsold = iou_threhsold
-        # define data loader
 
     def _load_model(self, model_path):
         model = DetectMultiBackend(model_path, device=self._device)
@@ -173,10 +172,10 @@ class BirdDetectorYolov5(Detector):
     def _get_boxes(self, prediction):
         return prediction[:, :4].numpy().tolist()
 
-    def detect(self, frame) -> Optional[List[Detection]]:
+    def detect(self, frame: Frame) -> Optional[List[Detection]]:
         # TODO: resize if needed
         # assumes im is in opencv BGR format
-        im = frame.transpose(2,0,1)[::-1] # BGR to RGB
+        im = frame.image.transpose(2,0,1)[::-1] # BGR to RGB
         im = np.ascontiguousarray(im)
         im = torch.from_numpy(im).to(self._model.device)
         im = im.half() if self._model.fp16 else im.float()  # uint8 to fp16/32
@@ -193,7 +192,7 @@ class BirdDetectorYolov5(Detector):
         confidences = self._get_confidences(stacked)
         boxes = self._get_boxes(stacked)
         if len (birds) > 0:
-            detection = [Detection(source_image=frame.copy(), labels=birds, confidences=confidences, bboxes=boxes, meta_information={"type": "bird detected"})]
+            detection = [Detection(frame_timestamp=frame.timestamp, labels=birds, confidences=confidences, bboxes=boxes, meta_information={"type": "bird detected"})]
             if self._event_manager is not None:
                 self._event_manager.notify("detection", detection)
             return detection
@@ -213,9 +212,10 @@ class BirdDetectorYolov5(Detector):
         image.show()
 
 
+# This is actually a composition of detectors -> make different base class?
 class SingleClassSequenceDetector(Detector):
     """Accumulates object predictions and implements functionality to
-    determine to most likely class of the object in the sequence.
+    determine the most likely class of the object in the sequence.
     When there are multiple objects in the seuqence, the class with the
     highest cumulative confidence is returned.
     For example, if there are 2 predictions for pigeon with confidence 0.2 each
@@ -250,6 +250,8 @@ class SingleClassSequenceDetector(Detector):
 
     def _blank_detections(self):
         self._detections = []
+        self._object_detections = {}
+        self._number_detections = 0
 
     def _rewrite_to_consensus(self):
         # get most likely object
