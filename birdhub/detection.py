@@ -74,8 +74,11 @@ class SimpleMotionDetector(Detector):
     def _preprocess_image(self, image):
         """Preprocess the image"""
         # Convert the image to grayscale
-        gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-
+        try:
+            gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        except cv2.error:
+            # TODO: send event that reinitialization of stream is needed
+            return None
         # Apply a blur to the image
         blur = cv2.GaussianBlur(gray_image, (self._blur, self._blur), 0)
 
@@ -100,6 +103,8 @@ class SimpleMotionDetector(Detector):
             return None
         # Convert the frames to grayscale
         prep_frame, prep_previous = self._preprocess_image(frame.image), self._preprocess_image(self._previous_frame.image)
+        if prep_frame is None or prep_previous is None:
+            return None
         # Calculate the absolute difference between the current frame and the previous frame
         frame_delta = cv2.absdiff(prep_previous, prep_frame)
         # Apply a threshold to the frame delta
