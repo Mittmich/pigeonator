@@ -173,7 +173,6 @@ class BirdDetectorYolov5(Detector):
         return prediction[:, :4].numpy().tolist()
 
     def detect(self, frame: Frame) -> Optional[List[Detection]]:
-        # TODO: resize if needed
         # assumes im is in opencv BGR format
         im = frame.image.transpose(2,0,1)[::-1] # BGR to RGB
         im = np.ascontiguousarray(im)
@@ -261,7 +260,7 @@ class SingleClassSequenceDetector(Detector):
             meta["most_likely_object"] = most_likely_object
             detection.set("meta_information", meta)
 
-    def detect(self, frame: np.ndarray) -> Optional[List[Detection]]:
+    def detect(self, frame: Frame) -> Optional[List[Detection]]:
         # accumulate detections
         self._accumulate_detections(self._detector.detect(frame))
         # determine if we have reached consensus
@@ -287,7 +286,30 @@ class MotionActivatedSingleClassDetector(SingleClassSequenceDetector):
     """Detector that is a composition of a motion detector and another detctor.
     The second detector only kicks in when motion is detected."""
     
-    def __init__(self, detector: Detector, motion_detector: Detector, minimum_number_detections:int=5) -> None:
+    def __init__(self, detector: Detector, motion_detector: Detector, minimum_number_detections:int=5, slack:int = 5) -> None:
         super().__init__(detector, minimum_number_detections)
         self._motion_detector = motion_detector
         self._motion_detected = False
+        self._slack = slack
+        self._stop_detecting_in = 0
+
+    def _reset_detector(self):
+        self._motion_detected = False
+        self._stop_detecting_in = 0
+    
+    def _set_slack(self, motion_detections: Optional[List[Detection]]):
+        if motion_detections is not None:
+            self._stop_detecting_in = self._slack
+        elif self._stop_detecting_in > 0:
+            self._stop_detecting_in -= 1
+
+    def detect(self, frame: Frame) -> Optional[List[Detection]]:
+        # pass image to motion detector
+        motion_detections = self._motion_detector.detect(frame)
+        self._set_slack(motion_detections)
+        # if motion is detected, pass detection to other detector
+        if motion_detections is not None or self._stop_detecting_in > 0:
+            result = super().detect(frame)
+            if result is not None:
+                self._reset_detector()
+                return result
