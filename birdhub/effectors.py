@@ -49,3 +49,6 @@ class MockEffector(Effector):
                     "effect_activated", {"type": "mock", "target_class": self._target_class}
                 )
                 self._last_activation = datetime.now()
+
+
+EFFECTORS = {"mock": MockEffector}
