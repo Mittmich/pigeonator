@@ -173,8 +173,9 @@ class BirdDetectorYolov5(Detector):
         return prediction[:, :4].numpy().tolist()
 
     def detect(self, frame: Frame) -> Optional[List[Detection]]:
+        resized = cv2.resize(frame.image, (self._image_size))
         # assumes im is in opencv BGR format
-        im = frame.image.transpose(2,0,1)[::-1] # BGR to RGB
+        im = resized.transpose(2,0,1)[::-1] # BGR to RGB
         im = np.ascontiguousarray(im)
         im = torch.from_numpy(im).to(self._model.device)
         im = im.half() if self._model.fp16 else im.float()  # uint8 to fp16/32
@@ -258,6 +259,7 @@ class SingleClassSequenceDetector(Detector):
         for detection in self._detections:
             meta = detection.get("meta_information", {})
             meta["most_likely_object"] = most_likely_object
+            meta['mean_confidence'] = self._object_detections[most_likely_object] / self._number_detections
             detection.set("meta_information", meta)
 
     def detect(self, frame: Frame) -> Optional[List[Detection]]:
@@ -296,12 +298,16 @@ class MotionActivatedSingleClassDetector(SingleClassSequenceDetector):
     def _reset_detector(self):
         self._motion_detected = False
         self._stop_detecting_in = 0
+        self._blank_detections()
     
     def _set_slack(self, motion_detections: Optional[List[Detection]]):
         if motion_detections is not None:
             self._stop_detecting_in = self._slack
         elif self._stop_detecting_in > 0:
             self._stop_detecting_in -= 1
+        else:
+            # no motion detected and no slack left
+            self._reset_detector()
 
     def detect(self, frame: Frame) -> Optional[List[Detection]]:
         # pass image to motion detector

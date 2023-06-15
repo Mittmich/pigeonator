@@ -41,7 +41,7 @@ def test_single_class_sequence_has_reached_consensus(long_sequence_detector, moc
     seq = SingleClassSequenceDetector(minimum_number_detections=5, detector=long_sequence_detector)
     seq.add_event_manager(mock_event_manager)
     result = seq.detect(empty_array)
-    assert result[0].get("meta_information") == {"most_likely_object": "tiger"}
+    assert result[0].get("meta_information")['most_likely_object'] == "tiger"
     mock_event_manager.notify.assert_called()
 
 def test_single_class_sequence_detector_resets_after_detection(small_sequence_detector, mock_event_manager, empty_array):
@@ -49,7 +49,7 @@ def test_single_class_sequence_detector_resets_after_detection(small_sequence_de
     seq.add_event_manager(mock_event_manager)
     seq.detect(empty_array)
     result = seq.detect(empty_array)
-    assert result[0].get("meta_information") == {"most_likely_object": "dog"}
+    assert result[0].get("meta_information")['most_likely_object'] == "dog"
     mock_event_manager.notify.assert_called()
     # check that further detections are not emitted
     mock_event_manager.reset_mock()

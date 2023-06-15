@@ -17,3 +17,15 @@ class Effector(ABC):
     def is_active(self) -> bool:
         """Check if the effector is active"""
         raise NotImplementedError
+
+
+class MockEffector(Effector):
+    """Mock effector that does nothing"""
+    def activate(self) -> None:
+        pass
+    
+    def deactivate(self) -> None:
+        pass
+    
+    def is_active(self) -> bool:
+        return False
