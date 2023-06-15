@@ -70,7 +70,7 @@ class VideoEventManager(Mediator):
             if self._recorder is not None:
                 self._recorder.register_detection(data)
             if self._effector is not None:
-                self._effector.activate(data)
+                self._effector.register_detection(data)
         if event == "effect_activated":
             self.log("effect_activated", data[-1].get("meta_information", None))
             if self._recorder is not None:
