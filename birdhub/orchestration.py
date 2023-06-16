@@ -2,6 +2,7 @@
 
 from abc import ABC, abstractmethod
 from typing import Optional
+import logging
 from birdhub.logging import logger
 
 
@@ -45,17 +46,17 @@ class VideoEventManager(Mediator):
         if self._effector is not None:
             self._effector.add_event_manager(self)
 
-    def log(self, event: str, message: Optional[str] = None) -> None:
+    def log(self, event: str, message: Optional[str] = None, level=logging.INFO) -> None:
         if event == "detection":
             self._detections_logged += 1
             if self._detections_logged % self._throttle_detection == 0:
                 message['accumulation_count'] = self._throttle_detection
-                logger.log_event(event, message)
+                logger.log_event(event, message, level=level)
         elif event == "recording_stopped":
             self._detections_logged = 0
-            logger.log_event(event, message)
+            logger.log_event(event, message, level=level)
         else:
-            logger.log_event(event, message)
+            logger.log_event(event, message, level=level)
 
     def notify(self, event: str, data: object) -> None:
         if event == "video_frame":

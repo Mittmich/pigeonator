@@ -1,6 +1,7 @@
 """Effectors that can be used to deter birds"""
 from abc import ABC, abstractmethod
 from typing import Optional, List
+import logging
 from datetime import timedelta, datetime
 from birdhub.orchestration import Mediator
 from birdhub.detection import Detection
@@ -38,6 +39,8 @@ class MockEffector(Effector):
 
     def register_detection(self, data: Optional[List[Detection]]) -> None:
         """Register detection"""
+        # log calling
+        self._event_manager.log("effect_called", {"type": "mock", "target_class": self._target_class}, level=logging.DEBUG)
         if data is None or len(data) == 0:
             return
         for detection in data:

@@ -6,6 +6,7 @@ from datetime import datetime
 import numpy as np
 import torch
 import numpy as np
+import logging
 from PIL import Image, ImageDraw, ImageFont
 from yolov5.models.common import DetectMultiBackend
 from yolov5.utils.general import non_max_suppression
@@ -191,6 +192,7 @@ class BirdDetectorYolov5(Detector):
         birds = self._extract_birds_from_prediction(stacked)
         confidences = self._get_confidences(stacked)
         boxes = self._get_boxes(stacked)
+        # TODO: move boxes to original image
         if len (birds) > 0:
             detection = [Detection(frame_timestamp=frame.timestamp, labels=birds, confidences=confidences, bboxes=boxes, meta_information={"type": "bird detected"})]
             if self._event_manager is not None:
@@ -239,6 +241,7 @@ class SingleClassSequenceDetector(Detector):
         if detections is None:
             return
         # extend detections
+        self._event_manager.log('detection', {'type': "bird", 'detection': detections}, level=logging.DEBUG)
         for detection in detections:
             objects, confidences = detection.get("labels", default=[]), detection.get("confidences", default=[])
             for obj, conf in zip(objects, confidences):
@@ -315,6 +318,8 @@ class MotionActivatedSingleClassDetector(SingleClassSequenceDetector):
         self._set_slack(motion_detections)
         # if motion is detected, pass detection to other detector
         if motion_detections is not None or self._stop_detecting_in > 0:
+            # log detection
+            self._event_manager.log("detection", {'type': "motion"}, level=logging.DEBUG)
             result = super().detect(frame)
             if result is not None:
                 self._reset_detector()
