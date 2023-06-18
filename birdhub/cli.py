@@ -79,7 +79,7 @@ def deter(url, outputdir,target_class, fps, slack, model, effector, record):
         recorder = None
     motion_detector = SimpleMotionDetector(threshold_area=5_000)
     bird_detector = BirdDetectorYolov5(model, confidence_threshold=0.6)
-    motion_activated_detector = MotionActivatedSingleClassDetector(bird_detector, motion_detector, minimum_number_detections=5)
+    motion_activated_detector = MotionActivatedSingleClassDetector(bird_detector, motion_detector, minimum_number_detections=3, slack=20)
     # instantiate effector
     effector = EFFECTORS[effector](target_class=target_class, cooldown_time=timedelta(seconds=30))
     VideoEventManager(stream=stream, recorder=recorder, detector=motion_activated_detector, throttle_detection=1, effector=effector)

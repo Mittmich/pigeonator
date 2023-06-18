@@ -8,14 +8,14 @@ from birdhub.effectors import MockEffector
 @pytest.fixture
 def mock_detection_correct_class():
     detection = Mock(spec=Detection)
-    detection.get.return_value = "correct_class"
+    detection.get.return_value = {"most_likely_object":"correct_class"}
     return detection
 
 
 @pytest.fixture
 def mock_detection_wrong_class():
     detection = Mock(spec=Detection)
-    detection.get.return_value = "wrong_class"
+    detection.get.return_value = {"most_likely_object":"wrong_class"}
     return detection
 
 

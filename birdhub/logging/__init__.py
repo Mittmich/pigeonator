@@ -19,7 +19,7 @@ if log_dir is None:
     log_dir = "logs"
     os.makedirs(log_dir, exist_ok=True)
 log_file = os.path.join(log_dir, "birdhub.log")
-fh = RotatingFileHandler(log_file, maxBytes=2000, backupCount=10)
+fh = RotatingFileHandler(log_file, maxBytes=2000_000_000, backupCount=10)
 fh.setLevel(logging.DEBUG)
 
 formatter = logging.Formatter(EventLogger.LOG_FORMAT, "%Y-%m-%dT%H:%M:%S")

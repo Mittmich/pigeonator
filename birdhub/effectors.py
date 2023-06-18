@@ -29,6 +29,10 @@ class Effector(ABC):
         else:
             return datetime.now() - self._last_activation
 
+    def _get_most_likely_object(self, data: Detection) -> Optional[str]:
+        meta_data = data.get("meta_data", {})
+        return meta_data.get("most_likely_object", None)
+
     def is_activation_allowed(self) -> bool:
         """Check if activation is allowed"""
         return self._get_time_since_last_activation() > self._cooldown_time
@@ -39,13 +43,11 @@ class MockEffector(Effector):
 
     def register_detection(self, data: Optional[List[Detection]]) -> None:
         """Register detection"""
-        # log calling
-        self._event_manager.log("effect_called", {"type": "mock", "target_class": self._target_class}, level=logging.DEBUG)
         if data is None or len(data) == 0:
             return
         for detection in data:
             if (
-                detection.get("most_likely_object", None) == self._target_class
+                self._get_most_likely_object(detection) == self._target_class
                 and self.is_activation_allowed()
             ):
                 self._event_manager.log(

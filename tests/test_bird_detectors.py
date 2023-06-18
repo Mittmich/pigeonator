@@ -25,7 +25,7 @@ class TestBirdDetectorYolov5:
     def test_get_boxes(self):
         prediction = torch.tensor([[1, 2, 3, 4, 0.5 , 1]])
 
-        boxes = self.bird_detector._get_boxes(prediction)
+        boxes = self.bird_detector._get_boxes(prediction, (640, 640))
         assert boxes == [[1, 2, 3, 4]]
 
     def test_detect_bird(self):

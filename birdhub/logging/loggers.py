@@ -3,7 +3,7 @@ import logging
 class EventLogger(logging.Logger):
     """Implements structured logs for birdhub"""
 
-    LOG_FORMAT = "%(asctime)s\t%(levelname)s\t%(message)s"
+    LOG_FORMAT = "%(asctime)s.%(msecs)03d\t%(levelname)s\t%(message)s"
     MESSAGE_FORMAT = "{event_type}\t{event_information}"
 
     def __init__(self, name, level=logging.NOTSET):

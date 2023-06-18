@@ -44,6 +44,8 @@ class Detection:
         return self.__str__()
 
 
+# TODO: create detection sequence that holds multiple detections and associated meta information
+
 class Detector(ABC):
     """Base class for detectors"""
 
@@ -170,10 +172,24 @@ class BirdDetectorYolov5(Detector):
     def _get_confidences(self, prediction):
         return prediction[:, -2].numpy().tolist()
     
-    def _get_boxes(self, prediction):
-        return prediction[:, :4].numpy().tolist()
+    def _get_boxes(self, prediction, original_size:Tuple[int]):
+        return [self._convert_bbox_to_original_size(i, original_size) for i in prediction[:, :4].numpy().tolist()]
+
+    def _convert_bbox_to_original_size(self, bbox, original_size):
+        original_width, original_height = original_size
+        resized_width, resized_height = self._image_size
+
+        scale_width = original_width / resized_width
+        scale_height = original_height / resized_height
+
+        x1, y1, x2, y2 = bbox
+
+        bbox_original = [x1 * scale_width, y1 * scale_height, x2 * scale_width, y2 * scale_height]
+
+        return bbox_original
 
     def detect(self, frame: Frame) -> Optional[List[Detection]]:
+        original_size = frame.image.shape[1], frame.image.shape[0]
         resized = cv2.resize(frame.image, (self._image_size))
         # assumes im is in opencv BGR format
         im = resized.transpose(2,0,1)[::-1] # BGR to RGB
@@ -191,7 +207,7 @@ class BirdDetectorYolov5(Detector):
         stacked = torch.cat(results, 0).cpu()
         birds = self._extract_birds_from_prediction(stacked)
         confidences = self._get_confidences(stacked)
-        boxes = self._get_boxes(stacked)
+        boxes = self._get_boxes(stacked, original_size)
         # TODO: move boxes to original image
         if len (birds) > 0:
             detection = [Detection(frame_timestamp=frame.timestamp, labels=birds, confidences=confidences, bboxes=boxes, meta_information={"type": "bird detected"})]
@@ -294,23 +310,18 @@ class MotionActivatedSingleClassDetector(SingleClassSequenceDetector):
     def __init__(self, detector: Detector, motion_detector: Detector, minimum_number_detections:int=5, slack:int = 5) -> None:
         super().__init__(detector, minimum_number_detections)
         self._motion_detector = motion_detector
-        self._motion_detected = False
         self._slack = slack
         self._stop_detecting_in = 0
-
-    def _reset_detector(self):
-        self._motion_detected = False
-        self._stop_detecting_in = 0
-        self._blank_detections()
     
     def _set_slack(self, motion_detections: Optional[List[Detection]]):
         if motion_detections is not None:
+            # log detection
+            self._event_manager.log("detection", {'type': "motion", 'detail': 'Class detector activated'}, level=logging.DEBUG)
             self._stop_detecting_in = self._slack
         elif self._stop_detecting_in > 0:
             self._stop_detecting_in -= 1
         else:
-            # no motion detected and no slack left
-            self._reset_detector()
+            self._blank_detections()
 
     def detect(self, frame: Frame) -> Optional[List[Detection]]:
         # pass image to motion detector
@@ -318,9 +329,8 @@ class MotionActivatedSingleClassDetector(SingleClassSequenceDetector):
         self._set_slack(motion_detections)
         # if motion is detected, pass detection to other detector
         if motion_detections is not None or self._stop_detecting_in > 0:
-            # log detection
-            self._event_manager.log("detection", {'type': "motion"}, level=logging.DEBUG)
             result = super().detect(frame)
             if result is not None:
-                self._reset_detector()
+                # Think about whether we want to reset the detector here -> this effectively means that we only detect one object per motion event
+                self._blank_detections()
                 return result

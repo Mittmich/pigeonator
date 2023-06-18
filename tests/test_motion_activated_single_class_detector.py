@@ -41,6 +41,7 @@ def test_motion_detected(detectors, frame):
     motion_activated_detector = MotionActivatedSingleClassDetector(
         detector, motion_detector
     )
+    motion_activated_detector.add_event_manager(MagicMock())
     motion_activated_detector.detect(frame)
 
     detector.detect.assert_called_once_with(frame)
@@ -56,6 +57,7 @@ def test_slack_time_no_motion(detectors, frame):
     motion_activated_detector = MotionActivatedSingleClassDetector(
         detector, motion_detector, slack=10
     )
+    motion_activated_detector.add_event_manager(MagicMock())
     motion_activated_detector.detect(frame)
     detector.detect.assert_called_once_with(frame)
     detector.reset_mock()
@@ -73,6 +75,7 @@ def test_reset_after_slack_expired(detectors, frame):
     motion_activated_detector = MotionActivatedSingleClassDetector(
         detector, motion_detector, slack=0
     )
+    motion_activated_detector.add_event_manager(MagicMock())
     motion_activated_detector.detect(frame)
     detector.detect.assert_called_once_with(frame)
     detector.reset_mock()
