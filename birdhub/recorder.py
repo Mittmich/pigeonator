@@ -42,7 +42,7 @@ class Recorder(ABC):
     def register_detection(self, detection: List[Detection]):
         pass
 
-    def register_effect_action(self):
+    def register_effect_activation(self, data: dict):
         pass
 
 

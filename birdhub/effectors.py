@@ -30,7 +30,7 @@ class Effector(ABC):
             return datetime.now() - self._last_activation
 
     def _get_most_likely_object(self, data: Detection) -> Optional[str]:
-        meta_data = data.get("meta_data", {})
+        meta_data = data.get("meta_information", {})
         return meta_data.get("most_likely_object", None)
 
     def is_activation_allowed(self) -> bool:
@@ -50,10 +50,10 @@ class MockEffector(Effector):
                 self._get_most_likely_object(detection) == self._target_class
                 and self.is_activation_allowed()
             ):
-                self._event_manager.log(
-                    "effect_activated", {"type": "mock", "target_class": self._target_class}
-                )
-                self._last_activation = datetime.now()
+                activation_time = datetime.now()
+                self._event_manager.notify("effect_activated", {'timestamp': detection.frame_timestamp, 'type': 'Mock Effect',
+                                                                'meta_information': {"type": "mock", "target_class": self._target_class}})
+                self._last_activation = activation_time
 
 
 EFFECTORS = {"mock": MockEffector}

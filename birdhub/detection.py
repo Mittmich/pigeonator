@@ -189,6 +189,8 @@ class BirdDetectorYolov5(Detector):
         return bbox_original
 
     def detect(self, frame: Frame) -> Optional[List[Detection]]:
+        if frame.image is None:
+            return None
         original_size = frame.image.shape[1], frame.image.shape[0]
         resized = cv2.resize(frame.image, (self._image_size))
         # assumes im is in opencv BGR format
@@ -208,7 +210,6 @@ class BirdDetectorYolov5(Detector):
         birds = self._extract_birds_from_prediction(stacked)
         confidences = self._get_confidences(stacked)
         boxes = self._get_boxes(stacked, original_size)
-        # TODO: move boxes to original image
         if len (birds) > 0:
             detection = [Detection(frame_timestamp=frame.timestamp, labels=birds, confidences=confidences, bboxes=boxes, meta_information={"type": "bird detected"})]
             if self._event_manager is not None:
@@ -257,14 +258,14 @@ class SingleClassSequenceDetector(Detector):
         if detections is None:
             return
         # extend detections
-        self._event_manager.log('detection', {'type': "bird", 'detection': detections}, level=logging.DEBUG)
         for detection in detections:
             objects, confidences = detection.get("labels", default=[]), detection.get("confidences", default=[])
             for obj, conf in zip(objects, confidences):
                 self._number_detections += 1
                 if obj not in self._object_detections:
                     self._object_detections[obj] = conf
-                self._object_detections[obj] = self._object_detections[obj] + conf
+                else:
+                    self._object_detections[obj] = self._object_detections[obj] + conf
         self._detections.extend(detections)
 
     def _blank_detections(self):

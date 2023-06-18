@@ -4,6 +4,7 @@ import numpy as np
 import datetime
 from birdhub.orchestration import Mediator
 from birdhub.logging import logger
+from time import sleep
 
 class Frame:
     def __init__(self, image: np.ndarray, timestamp: datetime.datetime):
