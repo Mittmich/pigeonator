@@ -1,7 +1,7 @@
 """Collection of recorder objects"""
 from abc import ABC, abstractmethod
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 import cv2
 from typing import List, Tuple, Optional, Union
 import numpy as np
@@ -72,6 +72,7 @@ class EventRecorder(Recorder):
         fps: int = 10,
         slack: int = 100,
         look_back_frames: int = 3,
+        detection_slack: int = 50,
         writer_factory: VideoWriter = VideoWriter,
         detection_writer_factory: VideoWriter = VideoWriter,
     ) -> None:
@@ -84,7 +85,10 @@ class EventRecorder(Recorder):
         self._stop_recording_in = 0
         self._detection_writer_factory = detection_writer_factory
         self._detection_image_buffer = []
+        self._detections = []
         self._recording = False
+        self._detection_slack = detection_slack
+        self._activations = []
 
     def _get_detection_output_file(self):
         return os.path.join(self._outputDir, f"{self._get_timestamp()}_detections.avi")
@@ -93,7 +97,7 @@ class EventRecorder(Recorder):
         image = frame.image
         candidate_detection = [d for d in detections if d.frame_timestamp == frame.timestamp]
         if len(candidate_detection) == 0:
-            return image
+            return Frame(image, frame.timestamp)
         detection = candidate_detection[0]
         boxes = detection.get("bboxes", default=[])
         labels = detection.get("labels", default=[])
@@ -104,10 +108,10 @@ class EventRecorder(Recorder):
             cv2.putText(
                 image, label, (x1, y2 + 15), cv2.FONT_HERSHEY_SIMPLEX, 1, 255
             )
-        return image
+        return Frame(image, frame.timestamp)
 
     def create_detection_frames(self, detections: List[Detection]) -> List[np.ndarray]:
-        # if we are recording, thake detection image buffer, otherwise take lookback frames
+        # if we are recording, take detection image buffer, otherwise take lookback frames
         if self._recording:
             images = [self._create_detection_frame(detections, frame) for frame in self._detection_image_buffer]
         else:
@@ -136,33 +140,62 @@ class EventRecorder(Recorder):
         if self._detection_writer:
             self._detection_writer.release()
             self._detection_writer = None
+    
+    def _update_detections(self, detection_data):
+        detection_frames = self.create_detection_frames(detection_data)
+        current_timestamps = set(i.timestamp for i in self._detections)
+        filtered_detection_frames = [i for i in detection_frames if i.timestamp not in current_timestamps]
+        self._detections.extend(filtered_detection_frames)
 
-    def _write_detections(self, detection_data):
+    def _write_detections(self):
+        # add all activations that are recorded to the detections
+        for activation in self._activations:
+            for frame in self._detections:
+                write_timestamps = [i.timestamp for i in self._detections if abs(i.timestamp - activation['timestamp']) < timedelta(seconds=0.5)]
+                self._add_activation(frame, activation, write_timestamps)
         if self._detection_writer is None:
             self._detection_writer = self._detection_writer_factory(
                 self._get_detection_output_file(), self._fps, self._frame_size
             )
-        detection_frames = self.create_detection_frames(detection_data)
-        if detection_frames is not None:
-            for detection_frame in detection_frames:
-                self._detection_writer.write(detection_frame)
+        for detection_frame in self._detections:
+            self._detection_writer.write(detection_frame.image)
+        self._detections = []
+        self._activations = []
+
+    def _add_activation(self,frame: Frame, data: dict, write_timestamps: List[datetime.timestamp]):
+            if frame.timestamp in write_timestamps:
+                # get boundary of this text
+                textsize = cv2.getTextSize(data['type'], cv2.FONT_HERSHEY_DUPLEX, 10, 2)[0]
+                # get coords based on boundary
+                textX = (frame.image.shape[1] - textsize[0]) // 2
+                textY = (frame.image.shape[0] + textsize[1]) // 2
+                cv2.putText(
+                    frame.image, data['type'], (textX, textY) , cv2.FONT_HERSHEY_DUPLEX, 10, (0, 0, 255), 2
+                )
+
+    def register_effect_activation(self, data: dict):
+        self._activations.append(data)
 
     def register_frame(self, frame:Frame):
         self._update_lookback_frames(frame)
+        # decide whether to write detection frames
+        if len(self._detections) > self._detection_slack:
+            self._write_detections()
         if self._stop_recording_in > 0:
             self._writer.write(frame.image)
             self._stop_recording_in -= 1
         elif self._writer is not None:
             self._event_manager.log("recording_stopped", "event recording stopped")
-            # write detection buffer images (if any)
-            self._write_detections([])
+            # write detections
+            self._update_detections([])
+            self._write_detections()
             self._recording = False
             self._destroy_writers()
 
     def register_detection(self, detection_data):
         if self._writer:
             self._stop_recording_in = self._slack
-            self._write_detections(detection_data)
+            self._update_detections(detection_data)
             self._look_back_frames = []
         else:
             self._event_manager.log("recording_started", "event recording started")
@@ -174,6 +207,6 @@ class EventRecorder(Recorder):
             for frame in self._look_back_frames:
                 self._writer.write(frame.image)
             # write detection data to a file
-            self._write_detections(detection_data)
+            self._update_detections(detection_data)
             self._look_back_frames = []
             self._recording = True

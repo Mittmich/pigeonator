@@ -51,7 +51,7 @@ class MockEffector(Effector):
                 and self.is_activation_allowed()
             ):
                 activation_time = datetime.now()
-                self._event_manager.notify("effect_activated", {'timestamp': detection.frame_timestamp, 'type': 'Mock Effect',
+                self._event_manager.notify("effect_activated", {'timestamp': activation_time, 'type': 'Mock Effect',
                                                                 'meta_information': {"type": "mock", "target_class": self._target_class}})
                 self._last_activation = activation_time
 
