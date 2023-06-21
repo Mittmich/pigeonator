@@ -150,8 +150,11 @@ class EventRecorder(Recorder):
     def _write_detections(self):
         # add all activations that are recorded to the detections
         for activation in self._activations:
+            write_timestamps = [i.timestamp 
+                    for i in self._detections 
+                        if i.timestamp > activation['timestamp'] and (i.timestamp - activation['timestamp']) < timedelta(seconds=2)
+                    ]
             for frame in self._detections:
-                write_timestamps = [i.timestamp for i in self._detections if abs(i.timestamp - activation['timestamp']) < timedelta(seconds=0.5)]
                 self._add_activation(frame, activation, write_timestamps)
         if self._detection_writer is None:
             self._detection_writer = self._detection_writer_factory(
@@ -165,12 +168,12 @@ class EventRecorder(Recorder):
     def _add_activation(self,frame: Frame, data: dict, write_timestamps: List[datetime.timestamp]):
             if frame.timestamp in write_timestamps:
                 # get boundary of this text
-                textsize = cv2.getTextSize(data['type'], cv2.FONT_HERSHEY_DUPLEX, 10, 2)[0]
+                textsize = cv2.getTextSize(data['type'], cv2.FONT_HERSHEY_DUPLEX, 7, 2)[0]
                 # get coords based on boundary
                 textX = (frame.image.shape[1] - textsize[0]) // 2
                 textY = (frame.image.shape[0] + textsize[1]) // 2
                 cv2.putText(
-                    frame.image, data['type'], (textX, textY) , cv2.FONT_HERSHEY_DUPLEX, 10, (0, 0, 255), 2
+                    frame.image, data['type'], (textX, textY) , cv2.FONT_HERSHEY_DUPLEX, 7, (0, 0, 255), 2
                 )
 
     def register_effect_activation(self, data: dict):

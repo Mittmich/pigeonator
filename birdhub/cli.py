@@ -71,8 +71,9 @@ def birds(url, outputdir, fps, slack, model):
 @click.option('--model', type=str, default="weights/bh_v1.onnx")
 @click.option('--effector', type=str, default="mock")
 @click.option('--record', type=bool, default=True)
+@click.option('--sound_path', type=str, default="sounds/crow_1.mp3")
 @click.option('--minimum_number_detections', type=int, default=5)
-def deter(url, outputdir,target_class, fps, slack, model, effector, record, minimum_number_detections):
+def deter(url, outputdir,target_class, fps, slack, model, effector, record, minimum_number_detections, sound_path):
     stream = Stream(url)
     if record:
         recorder = EventRecorder(outputDir=outputdir, frame_size=stream.frameSize, fps=fps, slack=slack, look_back_frames=20)
@@ -82,7 +83,7 @@ def deter(url, outputdir,target_class, fps, slack, model, effector, record, mini
     bird_detector = BirdDetectorYolov5(model, confidence_threshold=0.6)
     motion_activated_detector = MotionActivatedSingleClassDetector(bird_detector, motion_detector, minimum_number_detections=minimum_number_detections, slack=slack)
     # instantiate effector
-    effector = EFFECTORS[effector](target_class=target_class, cooldown_time=timedelta(seconds=30))
+    effector = EFFECTORS[effector](target_class=target_class, cooldown_time=timedelta(seconds=30), config={'sound_file': sound_path})
     VideoEventManager(stream=stream, recorder=recorder, detector=motion_activated_detector, throttle_detection=1, effector=effector)
     stream.stream()
     
