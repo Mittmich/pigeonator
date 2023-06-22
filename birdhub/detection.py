@@ -95,7 +95,7 @@ class SimpleMotionDetector(Detector):
                                   labels=["motion"]*len(rects),
                                   confidences=[1.0]*len(rects),
                                   bboxes=rects,
-                                  meta_information={"type": "motion"})
+                                  meta_information={"type": "motion", 'frame_timestamp': frame.timestamp.isoformat(sep=' ', timespec='milliseconds')})
             self._detections.append(detection)
 
     def detect(self, frame: Frame) -> Optional[List[Detection]]:
@@ -211,7 +211,8 @@ class BirdDetectorYolov5(Detector):
         confidences = self._get_confidences(stacked)
         boxes = self._get_boxes(stacked, original_size)
         if len (birds) > 0:
-            detection = [Detection(frame_timestamp=frame.timestamp, labels=birds, confidences=confidences, bboxes=boxes, meta_information={"type": "bird detected"})]
+            detection = [Detection(frame_timestamp=frame.timestamp, labels=birds, confidences=confidences, bboxes=boxes,
+                                   meta_information={"type": "bird detected", 'timestamp': frame.timestamp.isoformat(sep=' ', timespec='milliseconds')})]
             if self._event_manager is not None:
                 self._event_manager.notify("detection", detection)
             return detection
@@ -317,7 +318,8 @@ class MotionActivatedSingleClassDetector(SingleClassSequenceDetector):
     def _set_slack(self, motion_detections: Optional[List[Detection]]):
         if motion_detections is not None:
             # log detection
-            self._event_manager.log("detection", {'type': "motion", 'detail': 'Class detector activated'}, level=logging.DEBUG)
+            self._event_manager.log("detection", {'type': "motion", 'detail': 'Class detector activated',
+                                                  "timestamp":motion_detections[-1].get('frame_timestamp').isoformat(sep=' ', timespec='milliseconds')}, level=logging.DEBUG)
             self._stop_detecting_in = self._slack
         elif self._stop_detecting_in > 0:
             self._stop_detecting_in -= 1

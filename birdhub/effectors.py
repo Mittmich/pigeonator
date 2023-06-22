@@ -53,8 +53,12 @@ class MockEffector(Effector):
                 and self.is_activation_allowed()
             ):
                 activation_time = datetime.now()
+                detection_time = detection.get('frame_timestamp', None)
+                if detection_time is not None:
+                    detection_time = detection_time.isoformat(sep=' ', timespec='milliseconds')
                 self._event_manager.notify("effect_activated", {'timestamp': activation_time, 'type': 'Mock Effect',
-                                                                'meta_information': {"type": "mock", "target_class": self._target_class}})
+                                                                'meta_information': {"type": "mock", "target_class": self._target_class,
+                                                                                     'detecton_timestamp': detection_time}})
                 self._last_activation = activation_time
 
 
@@ -65,15 +69,22 @@ class SoundEffector(Effector):
         """Register detection"""
         if data is None or len(data) == 0:
             return
-        for detection in data:
+        # iterate over detections in reverse order to get the most recent detection
+        for detection in data[::-1]:
             if (
                 self._get_most_likely_object(detection) == self._target_class
                 and self.is_activation_allowed()
             ):
                 activation_time = datetime.now()
-                playsound(self._config["sound_file"])
+                Process(target=playsound, args=(self._config['sound_file'],)).start()
+                detection_time = detection.get('frame_timestamp', None)
+                if detection_time is not None:
+                    detection_time = detection_time.isoformat(sep=' ', timespec='milliseconds')
                 self._event_manager.notify("effect_activated", {'timestamp': datetime.now(), 'type': 'Audio Effector',
-                                                                'meta_information': {"type": "audio_effector", "target_class": self._target_class, "sound_file": self._config["sound_file"]}})
+                                                                'meta_information': {"type": "audio_effector", "target_class": self._target_class,
+                                                                                     "sound_file": self._config["sound_file"],
+                                                                                     'detecton_timestamp': detection_time,
+                                                                                     'activation_timestamp': datetime.now().isoformat(sep=' ', timespec='milliseconds')}})
                 self._last_activation = activation_time
 
 
