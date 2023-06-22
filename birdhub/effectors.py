@@ -71,9 +71,9 @@ class SoundEffector(Effector):
                 and self.is_activation_allowed()
             ):
                 activation_time = datetime.now()
-                Process(target=playsound, args=(self._config["sound_file"],)).start()
-                self._event_manager.notify("effect_activated", {'timestamp': activation_time, 'type': 'Audio Effector',
-                                                                'meta_information': {"type": "mock", "target_class": self._target_class, "sound_file": self._config["sound_file"]}})
+                playsound(self._config["sound_file"])
+                self._event_manager.notify("effect_activated", {'timestamp': datetime.now(), 'type': 'Audio Effector',
+                                                                'meta_information': {"type": "audio_effector", "target_class": self._target_class, "sound_file": self._config["sound_file"]}})
                 self._last_activation = activation_time
 
 

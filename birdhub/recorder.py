@@ -72,7 +72,7 @@ class EventRecorder(Recorder):
         fps: int = 10,
         slack: int = 100,
         look_back_frames: int = 3,
-        detection_slack: int = 50,
+        detection_slack: int = 100,
         writer_factory: VideoWriter = VideoWriter,
         detection_writer_factory: VideoWriter = VideoWriter,
     ) -> None:
