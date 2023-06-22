@@ -4,9 +4,6 @@ Pigeonator is a Python based software project designed for deterring pigeons usi
 
 In the following video, you can see pigeonator in action, detecting a pigeon and playing a recorded window knocking sound that causes the pigeon to fly away:
 
-<video src="examples/detering_example.mp4" loop autoplay style="max-width: 730px;">
-</video>
-
 ## Installation
 
 Before installing Pigeonator, ensure that you have Python 3.6 or above installed on your system. 
