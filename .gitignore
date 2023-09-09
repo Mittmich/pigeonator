@@ -2,7 +2,7 @@ playground/*
 *.pyc
 train_model/raw_data/*
 train_model/data/*
-*.pt
+train_model/*.pt
 .env
 birdhub.egg-info/*
 *.avi
