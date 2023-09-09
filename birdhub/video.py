@@ -4,12 +4,14 @@ import numpy as np
 import datetime
 from birdhub.orchestration import Mediator
 from birdhub.logging import logger
+from birdhub.timestamp_extraction import digit_model
 from time import sleep
 
 class Frame:
-    def __init__(self, image: np.ndarray, timestamp: datetime.datetime):
+    def __init__(self, image: np.ndarray, timestamp: datetime.datetime, capture_time: datetime.datetime):
         self.image = image
         self.timestamp = timestamp
+        self.capture_time = capture_time
 
 
 class Stream:
@@ -21,7 +23,10 @@ class Stream:
 
     def get_frame(self):
         ret, frame = self.cap.read()
-        return Frame(frame, datetime.datetime.now())
+        return Frame(frame, self._get_timestamp(frame), datetime.datetime.now())
+
+    def _get_timestamp(self, frame):
+        return digit_model.get_timestamp(frame)
 
     def add_event_manager(self, event_manager: Mediator):
         self._event_manager = event_manager
