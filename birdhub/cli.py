@@ -73,8 +73,9 @@ def birds(url, outputdir, fps, slack, model):
 @click.option('--record', type=bool, default=True)
 @click.option('--sound_path', type=str, default="sounds/crow_1.mp3")
 @click.option('--minimum_number_detections', type=int, default=5)
-def deter(url, outputdir,target_class, fps, slack, model, effector, record, minimum_number_detections, sound_path):
-    stream = Stream(url)
+@click.option('--ocr_weights', type=str, default="weights/ocr_v3.pt")
+def deter(url, outputdir,target_class, fps, slack, model, effector, record, minimum_number_detections, sound_path, ocr_weights):
+    stream = Stream(url, ocr_weights=ocr_weights)
     if record:
         recorder = EventRecorder(outputDir=outputdir, frame_size=stream.frameSize, fps=fps, slack=slack, look_back_frames=20)
     else:
