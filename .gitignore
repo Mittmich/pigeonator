@@ -8,3 +8,4 @@ birdhub.egg-info/*
 *.avi
 .vscode
 logs/*
+build/*

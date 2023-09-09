@@ -54,7 +54,7 @@ class MockEffector(Effector):
             ):
                 activation_time = datetime.now()
                 detection_time = detection.get('frame_timestamp', None)
-                if detection_time is not None:
+                if detection_time is not None and isinstance(detection_time, datetime):
                     detection_time = detection_time.isoformat(sep=' ', timespec='milliseconds')
                 self._event_manager.notify("effect_activated", {'timestamp': activation_time, 'type': 'Mock Effect',
                                                                 'meta_information': {"type": "mock", "target_class": self._target_class,
@@ -78,7 +78,7 @@ class SoundEffector(Effector):
                 activation_time = datetime.now()
                 Process(target=playsound, args=(self._config['sound_file'],)).start()
                 detection_time = detection.get('frame_timestamp', None)
-                if detection_time is not None:
+                if detection_time is not None and isinstance(detection_time, datetime):
                     detection_time = detection_time.isoformat(sep=' ', timespec='milliseconds')
                 self._event_manager.notify("effect_activated", {'timestamp': datetime.now(), 'type': 'Audio Effector',
                                                                 'meta_information': {"type": "audio_effector", "target_class": self._target_class,

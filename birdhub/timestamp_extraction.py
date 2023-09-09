@@ -8,7 +8,6 @@ import torch.optim as optim
 from torchvision.transforms import ToTensor, Compose, Normalize, Resize
 
 IMAGE_TRANSFORM = Compose([ToTensor(), Resize((16, 25), antialias=True), Normalize((0.1307,), (0.3081,))])
-WEIGTHS_PATH = "../weigthts/ocr_v3.pt"
 
 
 
@@ -63,6 +62,3 @@ class DigitModel(nn.Module):
         timestamp = datetime.datetime.now()
         # update time
         return timestamp.replace(hour=hour, minute=minute, second=second)
-
-digit_model = DigitModel()
-digit_model.load_state_dict(torch.load(WEIGTHS_PATH))

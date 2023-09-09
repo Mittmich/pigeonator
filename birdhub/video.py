@@ -1,35 +1,58 @@
 """A module to handle video streams and video files."""
+import datetime
+from typing import Optional
 import cv2
 import numpy as np
-import datetime
+import torch
 from birdhub.orchestration import Mediator
 from birdhub.logging import logger
-from birdhub.timestamp_extraction import digit_model
-from time import sleep
+from birdhub.timestamp_extraction import DigitModel
 
 class Frame:
-    def __init__(self, image: np.ndarray, timestamp: datetime.datetime, capture_time: datetime.datetime):
+    def __init__(self, image: np.ndarray, timestamp: datetime.datetime, capture_time: Optional[datetime.datetime] = None):
         self.image = image
         self.timestamp = timestamp
-        self.capture_time = capture_time
+        if capture_time is None:
+            self.capture_time = datetime.datetime.now()
+        else:
+            self.capture_time = capture_time
 
 
 class Stream:
 
-    def __init__(self, streamurl):
+    def __init__(self, streamurl, ocr_weights="../weights/ocr_v3.pt", write_timestamps=True):
         self.streamurl = streamurl
         self.cap = cv2.VideoCapture(self.streamurl)
         self._event_manager = None
+        self._previous_timestamp = None
+        self._frame_index = 0
+        self._digit_model = DigitModel()
+        self._digit_model.load_state_dict(torch.load(ocr_weights))
+        self._write_timestamps = write_timestamps
 
     def get_frame(self):
         ret, frame = self.cap.read()
-        return Frame(frame, self._get_timestamp(frame), datetime.datetime.now())
+        if self._frame_index % 10 == 0:
+            timestamp = self._get_timestamp(frame)
+            self._previous_timestamp = timestamp
+            self._frame_index = 0
+        else:
+            timestamp = self._previous_timestamp
+        self._frame_index += 1
+        frame = Frame(frame, timestamp, datetime.datetime.now())
+        if self._write_timestamps:
+            self._write_timestamp(frame)
+        return frame
 
     def _get_timestamp(self, frame):
-        return digit_model.get_timestamp(frame)
+        return self._digit_model.get_timestamp(frame)
 
     def add_event_manager(self, event_manager: Mediator):
         self._event_manager = event_manager
+
+    def _write_timestamp(self, frame):
+        cv2.putText(frame.image, 'O: ' + frame.timestamp.strftime("%H:%M:%S"), (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
+        cv2.putText(frame.image, 'C: ' + frame.capture_time.strftime("%H:%M:%S"), (10, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
 
     def stream(self):
         self._event_manager.log("stream_started", None)
