@@ -1,5 +1,6 @@
 """A module to handle video streams and video files."""
 import datetime
+import logging
 from typing import Optional
 import cv2
 import numpy as np
@@ -45,7 +46,13 @@ class Stream:
         return frame
 
     def _get_timestamp(self, frame):
-        return self._digit_model.get_timestamp(frame)
+        try:
+            timestamp = self._digit_model.get_timestamp(frame)
+        except ValueError as e:
+            self._event_manager.log("timestamp_error", None, level=logging.WARNING)
+            logger.warning("Could not extract timestamp from frame: {}".format(e))
+            timestamp = None
+        return timestamp
 
     def add_event_manager(self, event_manager: Mediator):
         self._event_manager = event_manager
