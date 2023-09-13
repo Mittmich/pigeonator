@@ -40,7 +40,8 @@ class Stream:
             self._previous_timestamp = timestamp
             self._frame_index = 0
         else:
-            timestamp = self._previous_timestamp
+            # add index to microsecond part of timestamp to make it unique
+            timestamp = self._previous_timestamp + datetime.timedelta(microseconds=self._frame_index)
         self._frame_index += 1
         frame = Frame(frame, timestamp, datetime.datetime.now())
         if self._write_timestamps:
@@ -62,8 +63,8 @@ class Stream:
     def _write_timestamp(self, frame):
         if frame.timestamp is None:
             return
-        cv2.putText(frame.image, 'O: ' + frame.timestamp.strftime("%H:%M:%S"), (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
-        cv2.putText(frame.image, 'C: ' + frame.capture_time.strftime("%H:%M:%S"), (10, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
+        cv2.putText(frame.image, 'O: ' + frame.timestamp.strftime("%H:%M:%S,%f"), (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
+        cv2.putText(frame.image, 'C: ' + frame.capture_time.strftime("%H:%M:%S,%f"), (10, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
 
     def stream(self):
         self._event_manager.log("stream_started", None)
