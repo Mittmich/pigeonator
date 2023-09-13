@@ -84,7 +84,8 @@ class SoundEffector(Effector):
                                                                 'meta_information': {"type": "audio_effector", "target_class": self._target_class,
                                                                                      "sound_file": self._config["sound_file"],
                                                                                      'detecton_timestamp': detection_time,
-                                                                                     'activation_timestamp': datetime.now().isoformat(sep=' ', timespec='milliseconds')}})
+                                                                                     'activation_timestamp': activation_time.isoformat(sep=' ', timespec='milliseconds')
+                                                                                     }})
                 self._last_activation = activation_time
 
 

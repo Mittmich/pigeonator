@@ -35,6 +35,8 @@ class Stream:
         ret, frame = self.cap.read()
         if self._frame_index % 10 == 0:
             timestamp = self._get_timestamp(frame)
+            if timestamp is None:
+                timestamp = self._previous_timestamp
             self._previous_timestamp = timestamp
             self._frame_index = 0
         else:
@@ -49,7 +51,7 @@ class Stream:
         try:
             timestamp = self._digit_model.get_timestamp(frame)
         except ValueError as e:
-            self._event_manager.log("timestamp_error", None, level=logging.WARNING)
+            self._event_manager.log("timestamp_error", None, level=logging.INFO)
             logger.warning("Could not extract timestamp from frame: {}".format(e))
             timestamp = None
         return timestamp
@@ -58,6 +60,8 @@ class Stream:
         self._event_manager = event_manager
 
     def _write_timestamp(self, frame):
+        if frame.timestamp is None:
+            return
         cv2.putText(frame.image, 'O: ' + frame.timestamp.strftime("%H:%M:%S"), (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
         cv2.putText(frame.image, 'C: ' + frame.capture_time.strftime("%H:%M:%S"), (10, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
 
