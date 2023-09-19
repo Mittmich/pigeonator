@@ -54,6 +54,8 @@ class DigitModel(nn.Module):
             return torch.argmax(logits, dim=1)
     
     def get_timestamp(self, frame):
+        if frame is None:
+            return None
         digits = self.extract_time_digits_tapo(frame)
         predictions = self.predict(digits).tolist()
         hour = predictions[0] * 10 + predictions[1]
