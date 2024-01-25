@@ -28,7 +28,7 @@ class Stream:
         self._previous_timestamp = None
         self._frame_index = 0
         self._digit_model = DigitModel()
-        self._digit_model.load_state_dict(torch.load(ocr_weights))
+        self._digit_model.load_state_dict(torch.load(ocr_weights, map_location=torch.device('cpu')))
         self._write_timestamps = write_timestamps
 
     def get_frame(self):
@@ -54,6 +54,9 @@ class Stream:
         except ValueError as e:
             self._event_manager.log("timestamp_error", None, level=logging.INFO)
             logger.warning("Could not extract timestamp from frame: {}".format(e))
+            # write frame to file for debugging
+            now = datetime.datetime.now()
+            cv2.imwrite(f"train_model/raw_data/timestamp_errors/timestamp_error_{now.strftime('%H:%M:%S')}.jpg", frame)
             timestamp = None
         return timestamp
 
