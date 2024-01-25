@@ -9,7 +9,9 @@ from birdhub.detection import Detection
 
 
 class Effector(ABC):
-    def __init__(self, target_class: str, cooldown_time: timedelta, config: Optional[Dict]=None) -> None:
+    def __init__(
+        self, target_class: str, cooldown_time: timedelta, config: Optional[Dict] = None
+    ) -> None:
         self._event_manager = None
         self._target_class = target_class
         self._cooldown_time = cooldown_time
@@ -53,12 +55,23 @@ class MockEffector(Effector):
                 and self.is_activation_allowed()
             ):
                 activation_time = datetime.now()
-                detection_time = detection.get('frame_timestamp', None)
+                detection_time = detection.get("frame_timestamp", None)
                 if detection_time is not None and isinstance(detection_time, datetime):
-                    detection_time = detection_time.isoformat(sep=' ', timespec='milliseconds')
-                self._event_manager.notify("effect_activated", {'timestamp': activation_time, 'type': 'Mock Effect',
-                                                                'meta_information': {"type": "mock", "target_class": self._target_class,
-                                                                                     'detecton_timestamp': detection_time}})
+                    detection_time = detection_time.isoformat(
+                        sep=" ", timespec="milliseconds"
+                    )
+                self._event_manager.notify(
+                    "effect_activated",
+                    {
+                        "timestamp": activation_time,
+                        "type": "Mock Effect",
+                        "meta_information": {
+                            "type": "mock",
+                            "target_class": self._target_class,
+                            "detecton_timestamp": detection_time,
+                        },
+                    },
+                )
                 self._last_activation = activation_time
 
 
@@ -76,18 +89,29 @@ class SoundEffector(Effector):
                 and self.is_activation_allowed()
             ):
                 activation_time = datetime.now()
-                Process(target=playsound, args=(self._config['sound_file'],)).start()
-                detection_time = detection.get('frame_timestamp', None)
+                Process(target=playsound, args=(self._config["sound_file"],)).start()
+                detection_time = detection.get("frame_timestamp", None)
                 if detection_time is not None and isinstance(detection_time, datetime):
-                    detection_time = detection_time.isoformat(sep=' ', timespec='milliseconds')
-                self._event_manager.notify("effect_activated", {'timestamp': datetime.now(), 'type': 'Audio Effector',
-                                                                'meta_information': {"type": "audio_effector", "target_class": self._target_class,
-                                                                                     "sound_file": self._config["sound_file"],
-                                                                                     'detecton_timestamp': detection_time,
-                                                                                     'activation_timestamp': activation_time.isoformat(sep=' ', timespec='milliseconds')
-                                                                                     }})
+                    detection_time = detection_time.isoformat(
+                        sep=" ", timespec="milliseconds"
+                    )
+                self._event_manager.notify(
+                    "effect_activated",
+                    {
+                        "timestamp": datetime.now(),
+                        "type": "Audio Effector",
+                        "meta_information": {
+                            "type": "audio_effector",
+                            "target_class": self._target_class,
+                            "sound_file": self._config["sound_file"],
+                            "detecton_timestamp": detection_time,
+                            "activation_timestamp": activation_time.isoformat(
+                                sep=" ", timespec="milliseconds"
+                            ),
+                        },
+                    },
+                )
                 self._last_activation = activation_time
-
 
 
 EFFECTORS = {"mock": MockEffector, "sound": SoundEffector}

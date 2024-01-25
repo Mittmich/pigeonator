@@ -65,6 +65,7 @@ def test_slack_time_no_motion(detectors, frame):
     motion_activated_detector.detect(frame)
     detector.detect.assert_called_once_with(frame)
 
+
 def test_reset_after_slack_expired(detectors, frame):
     """test that detector is reset after slack time has expired"""
     detector, motion_detector = detectors

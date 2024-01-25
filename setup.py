@@ -1,7 +1,7 @@
 import setuptools
 
-with open('requirements.txt') as f:
-    required = f.read().splitlines() 
+with open("requirements.txt") as f:
+    required = f.read().splitlines()
 
 setuptools.setup(
     name="birdhub",
@@ -9,8 +9,8 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     install_requires=required,
     entry_points={
-        'console_scripts': [
-            'pgn = birdhub.cli:cli',
+        "console_scripts": [
+            "pgn = birdhub.cli:cli",
         ],
     },
 )

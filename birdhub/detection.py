@@ -14,15 +14,18 @@ from yolov5.utils.torch_utils import select_device
 from birdhub.orchestration import Mediator
 from birdhub.video import Frame
 
+
 class Detection:
     """Class to represent a detection"""
 
-    def __init__(self, 
-                       frame_timestamp:datetime,
-                       labels:Optional[List[str]]=None,
-                       confidences:Optional[List[float]]=None,
-                       bboxes:Optional[List[np.ndarray]]=None,
-                       meta_information:Dict[str, str]=None):
+    def __init__(
+        self,
+        frame_timestamp: datetime,
+        labels: Optional[List[str]] = None,
+        confidences: Optional[List[float]] = None,
+        bboxes: Optional[List[np.ndarray]] = None,
+        meta_information: Dict[str, str] = None,
+    ):
         self.frame_timestamp = frame_timestamp
         self.labels = labels
         self.confidences = confidences
@@ -46,6 +49,7 @@ class Detection:
 
 # TODO: create detection sequence that holds multiple detections and associated meta information
 
+
 class Detector(ABC):
     """Base class for detectors"""
 
@@ -63,7 +67,14 @@ class Detector(ABC):
 class SimpleMotionDetector(Detector):
     """Simple motion detector that compares the current frame with the previous frame"""
 
-    def __init__(self, threshold=20, blur=21, dilation_kernel=np.ones((5,5)), threshold_area=50, activation_frames:int=5):
+    def __init__(
+        self,
+        threshold=20,
+        blur=21,
+        dilation_kernel=np.ones((5, 5)),
+        threshold_area=50,
+        activation_frames: int = 5,
+    ):
         super().__init__()
         self._threshold = threshold
         self._blur = blur
@@ -91,11 +102,17 @@ class SimpleMotionDetector(Detector):
         """Update the detection with the given rects if they are not empty"""
         if len(rects) > 0:
             detection = Detection(
-                                  frame.timestamp,
-                                  labels=["motion"]*len(rects),
-                                  confidences=[1.0]*len(rects),
-                                  bboxes=rects,
-                                  meta_information={"type": "motion", 'frame_timestamp': frame.timestamp.isoformat(sep=' ', timespec='milliseconds')})
+                frame.timestamp,
+                labels=["motion"] * len(rects),
+                confidences=[1.0] * len(rects),
+                bboxes=rects,
+                meta_information={
+                    "type": "motion",
+                    "frame_timestamp": frame.timestamp.isoformat(
+                        sep=" ", timespec="milliseconds"
+                    ),
+                },
+            )
             self._detections.append(detection)
 
     def detect(self, frame: Frame) -> Optional[List[Detection]]:
@@ -105,17 +122,23 @@ class SimpleMotionDetector(Detector):
             self._previous_frame = frame
             return None
         # Convert the frames to grayscale
-        prep_frame, prep_previous = self._preprocess_image(frame.image), self._preprocess_image(self._previous_frame.image)
+        prep_frame, prep_previous = self._preprocess_image(
+            frame.image
+        ), self._preprocess_image(self._previous_frame.image)
         if prep_frame is None or prep_previous is None:
             return None
         # Calculate the absolute difference between the current frame and the previous frame
         frame_delta = cv2.absdiff(prep_previous, prep_frame)
         # Apply a threshold to the frame delta
-        _, threshold = cv2.threshold(frame_delta, self._threshold, 255, cv2.THRESH_BINARY)
+        _, threshold = cv2.threshold(
+            frame_delta, self._threshold, 255, cv2.THRESH_BINARY
+        )
         # Dilate the thresholded image to fill in holes
         dilated = cv2.dilate(threshold, self._dilation_kernel, iterations=2)
         # Find contours on the dilated image
-        contours, _ = cv2.findContours(dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        contours, _ = cv2.findContours(
+            dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+        )
         rects = []
         for contour in contours:
             if cv2.contourArea(contour) < self._threshold_area:
@@ -142,17 +165,19 @@ class SimpleMotionDetector(Detector):
         self._previous_frame = frame
         return None
 
+
 # Adjust this to detector interface
 class BirdDetectorYolov5(Detector):
-
-    def __init__(self,
-                 model_path:str,
-                 image_size:Tuple[int]=(640,640),
-                 confidence_threshold:float=0.25,
-                 iou_threhsold:float=0.45) -> None:
+    def __init__(
+        self,
+        model_path: str,
+        image_size: Tuple[int] = (640, 640),
+        confidence_threshold: float = 0.25,
+        iou_threhsold: float = 0.45,
+    ) -> None:
         super().__init__()
         # Load model
-        self._device = select_device('')
+        self._device = select_device("")
         self._model = self._load_model(model_path)
         self._classes = self._model.names
         self._stride = self._model.stride
@@ -162,18 +187,21 @@ class BirdDetectorYolov5(Detector):
 
     def _load_model(self, model_path):
         model = DetectMultiBackend(model_path, device=self._device)
-        #model = torch.hub.load('ultralytics/yolov5', 'custom', path=model_path, force_reload=False)
+        # model = torch.hub.load('ultralytics/yolov5', 'custom', path=model_path, force_reload=False)
         model.to(self._device)
         return model
-    
+
     def _extract_birds_from_prediction(self, prediction):
         return [self._classes[int(i)] for i in prediction.numpy()[:, -1]]
 
     def _get_confidences(self, prediction):
         return prediction[:, -2].numpy().tolist()
-    
-    def _get_boxes(self, prediction, original_size:Tuple[int]):
-        return [self._convert_bbox_to_original_size(i, original_size) for i in prediction[:, :4].numpy().tolist()]
+
+    def _get_boxes(self, prediction, original_size: Tuple[int]):
+        return [
+            self._convert_bbox_to_original_size(i, original_size)
+            for i in prediction[:, :4].numpy().tolist()
+        ]
 
     def _convert_bbox_to_original_size(self, bbox, original_size):
         original_width, original_height = original_size
@@ -184,7 +212,12 @@ class BirdDetectorYolov5(Detector):
 
         x1, y1, x2, y2 = bbox
 
-        bbox_original = [x1 * scale_width, y1 * scale_height, x2 * scale_width, y2 * scale_height]
+        bbox_original = [
+            x1 * scale_width,
+            y1 * scale_height,
+            x2 * scale_width,
+            y2 * scale_height,
+        ]
 
         return bbox_original
 
@@ -194,7 +227,7 @@ class BirdDetectorYolov5(Detector):
         original_size = frame.image.shape[1], frame.image.shape[0]
         resized = cv2.resize(frame.image, (self._image_size))
         # assumes im is in opencv BGR format
-        im = resized.transpose(2,0,1)[::-1] # BGR to RGB
+        im = resized.transpose(2, 0, 1)[::-1]  # BGR to RGB
         im = np.ascontiguousarray(im)
         im = torch.from_numpy(im).to(self._model.device)
         im = im.half() if self._model.fp16 else im.float()  # uint8 to fp16/32
@@ -202,17 +235,28 @@ class BirdDetectorYolov5(Detector):
         if len(im.shape) == 3:
             im = im[None]  # expand for batch dim
         results = self._model(im, augment=False, visualize=False)
-        results = non_max_suppression(results,
-                                      self._confidence_threshold,
-                                      self._iou_threhsold,
-                                      max_det=1000)
+        results = non_max_suppression(
+            results, self._confidence_threshold, self._iou_threhsold, max_det=1000
+        )
         stacked = torch.cat(results, 0).cpu()
         birds = self._extract_birds_from_prediction(stacked)
         confidences = self._get_confidences(stacked)
         boxes = self._get_boxes(stacked, original_size)
-        if len (birds) > 0:
-            detection = [Detection(frame_timestamp=frame.timestamp, labels=birds, confidences=confidences, bboxes=boxes,
-                                   meta_information={"type": "bird detected", 'timestamp': frame.timestamp.isoformat(sep=' ', timespec='milliseconds')})]
+        if len(birds) > 0:
+            detection = [
+                Detection(
+                    frame_timestamp=frame.timestamp,
+                    labels=birds,
+                    confidences=confidences,
+                    bboxes=boxes,
+                    meta_information={
+                        "type": "bird detected",
+                        "timestamp": frame.timestamp.isoformat(
+                            sep=" ", timespec="milliseconds"
+                        ),
+                    },
+                )
+            ]
             if self._event_manager is not None:
                 self._event_manager.notify("detection", detection)
             return detection
@@ -224,11 +268,11 @@ class BirdDetectorYolov5(Detector):
         for box, label in zip(boxes, labels):
             x1, y1, x2, y2 = box
             # Draw the bounding box with red lines
-            draw.rectangle((x1, y1, x2, y2),
-                            outline=(255, 0, 0), # Red in RGB
-                            width=5)             # Line width
+            draw.rectangle(
+                (x1, y1, x2, y2), outline=(255, 0, 0), width=5  # Red in RGB
+            )  # Line width
             font = ImageFont.truetype("arial.ttf", 30)
-            draw.text((x1, y1 - 30), label, fill=(255, 0, 0), font=font) # Black in RGB
+            draw.text((x1, y1 - 30), label, fill=(255, 0, 0), font=font)  # Black in RGB
         image.show()
 
 
@@ -241,26 +285,26 @@ class SingleClassSequenceDetector(Detector):
     For example, if there are 2 predictions for pigeon with confidence 0.2 each
     and one prediction for crow, then crow will be returned.
     If the pigeions in the example above had confidence 0.5 each, then pigeon would
-    be returned. 
+    be returned.
     If there are multiple objects within the same frame, they areaccumulated together.
     """
 
-
-    def __init__(self, detector: Detector, minimum_number_detections:int=5) -> None:
+    def __init__(self, detector: Detector, minimum_number_detections: int = 5) -> None:
         super().__init__()
         self._detections = []
         self._object_detections = {}
         self._number_detections = 0
         self._minimum_number_detections = minimum_number_detections
         self._detector = detector
-    
 
     def _accumulate_detections(self, detections: Optional[List[Detection]]):
         if detections is None:
             return
         # extend detections
         for detection in detections:
-            objects, confidences = detection.get("labels", default=[]), detection.get("confidences", default=[])
+            objects, confidences = detection.get("labels", default=[]), detection.get(
+                "confidences", default=[]
+            )
             for obj, conf in zip(objects, confidences):
                 self._number_detections += 1
                 if obj not in self._object_detections:
@@ -280,7 +324,9 @@ class SingleClassSequenceDetector(Detector):
         for detection in self._detections:
             meta = detection.get("meta_information", {})
             meta["most_likely_object"] = most_likely_object
-            meta['mean_confidence'] = self._object_detections[most_likely_object] / self._number_detections
+            meta["mean_confidence"] = (
+                self._object_detections[most_likely_object] / self._number_detections
+            )
             detection.set("meta_information", meta)
 
     def detect(self, frame: Frame) -> Optional[List[Detection]]:
@@ -295,10 +341,10 @@ class SingleClassSequenceDetector(Detector):
                 self._event_manager.notify("detection", output)
             self._blank_detections()
             return output
-    
+
     def _has_reached_consensus(self):
         return self._number_detections >= self._minimum_number_detections
-    
+
     def _get_most_likely_object(self):
         if self._number_detections < self._minimum_number_detections:
             return None
@@ -308,18 +354,33 @@ class SingleClassSequenceDetector(Detector):
 class MotionActivatedSingleClassDetector(SingleClassSequenceDetector):
     """Detector that is a composition of a motion detector and another detctor.
     The second detector only kicks in when motion is detected."""
-    
-    def __init__(self, detector: Detector, motion_detector: Detector, minimum_number_detections:int=5, slack:int = 5) -> None:
+
+    def __init__(
+        self,
+        detector: Detector,
+        motion_detector: Detector,
+        minimum_number_detections: int = 5,
+        slack: int = 5,
+    ) -> None:
         super().__init__(detector, minimum_number_detections)
         self._motion_detector = motion_detector
         self._slack = slack
         self._stop_detecting_in = 0
-    
+
     def _set_slack(self, motion_detections: Optional[List[Detection]]):
         if motion_detections is not None:
             # log detection
-            self._event_manager.log("detection", {'type': "motion", 'detail': 'Class detector activated',
-                                                  "timestamp":motion_detections[-1].get('frame_timestamp').isoformat(sep=' ', timespec='milliseconds')}, level=logging.DEBUG)
+            self._event_manager.log(
+                "detection",
+                {
+                    "type": "motion",
+                    "detail": "Class detector activated",
+                    "timestamp": motion_detections[-1]
+                    .get("frame_timestamp")
+                    .isoformat(sep=" ", timespec="milliseconds"),
+                },
+                level=logging.DEBUG,
+            )
             self._stop_detecting_in = self._slack
         elif self._stop_detecting_in > 0:
             self._stop_detecting_in -= 1

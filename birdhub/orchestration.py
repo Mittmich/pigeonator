@@ -29,7 +29,7 @@ class VideoEventManager(Mediator):
         recorder: Optional["Recorder"] = None,
         detector: Optional["Detector"] = None,
         effector: Optional["Effector"] = None,
-        throttle_detection: int = 10
+        throttle_detection: int = 10,
     ) -> None:
         self._stream = stream
         self._recorder = recorder
@@ -46,11 +46,13 @@ class VideoEventManager(Mediator):
         if self._effector is not None:
             self._effector.add_event_manager(self)
 
-    def log(self, event: str, message: Optional[str] = None, level=logging.INFO) -> None:
+    def log(
+        self, event: str, message: Optional[str] = None, level=logging.INFO
+    ) -> None:
         if event == "detection":
             self._detections_logged += 1
             if self._detections_logged % self._throttle_detection == 0:
-                message['accumulation_count'] = self._throttle_detection
+                message["accumulation_count"] = self._throttle_detection
                 logger.log_event(event, message, level=level)
         elif event == "recording_stopped":
             self._detections_logged = 0

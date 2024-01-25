@@ -7,13 +7,15 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torchvision.transforms import ToTensor, Compose, Normalize, Resize
 
-IMAGE_TRANSFORM = Compose([ToTensor(), Resize((16, 25), antialias=True), Normalize((0.1307,), (0.3081,))])
-
+IMAGE_TRANSFORM = Compose(
+    [ToTensor(), Resize((16, 25), antialias=True), Normalize((0.1307,), (0.3081,))]
+)
 
 
 def get_timestamp_area_tapo():
     """Returns a tuple of (start_x, end_x, start_y, end_y) for the timestamp area"""
     return (350, 605, 0, 50)
+
 
 class DigitModel(nn.Module):
     def __init__(self):
@@ -38,9 +40,9 @@ class DigitModel(nn.Module):
         """Extracts digits from an image. Parameters are specific to TAPO TP-link camera.
         returns a list of length 6, with [h,h,m,m,s,s]"""
         start_x, end_x, start_y, end_y = get_timestamp_area_tapo()
-        digit_x = list(np.linspace(start_x , end_x, 9))
+        digit_x = list(np.linspace(start_x, end_x, 9))
         digits = [
-            frame[:end_y, int(x1):int(x2), :] for x1, x2  in zip(digit_x, digit_x[1:])
+            frame[:end_y, int(x1) : int(x2), :] for x1, x2 in zip(digit_x, digit_x[1:])
         ]
         return digits[0:2] + digits[3:5] + digits[6:8]
 
@@ -52,7 +54,7 @@ class DigitModel(nn.Module):
         with torch.no_grad():
             logits = self(self.preprocess_images(images))
             return torch.argmax(logits, dim=1)
-    
+
     def get_timestamp(self, frame):
         if frame is None:
             return None
