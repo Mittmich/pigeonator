@@ -7,6 +7,7 @@ import numpy as np
 import torch
 import numpy as np
 import logging
+from multiprocessing import Pipe, Process, Queue
 from PIL import Image, ImageDraw, ImageFont
 from yolov5.models.common import DetectMultiBackend
 from yolov5.utils.general import non_max_suppression
@@ -54,15 +55,33 @@ class Detector(ABC):
     """Base class for detectors"""
 
     def __init__(self) -> None:
-        self._event_manager = None
+        self._event_manager_connection = None
 
     def add_event_manager(self, event_manager: Mediator):
-        self._event_manager = event_manager
+        # create commuinication pipe
+        self._event_manager_connection, child_connection = Pipe()
+        # register pipe with event manager
+        event_manager.register_pipe("detector", child_connection)
 
     @abstractmethod
     def detect(self, frame: Frame) -> Optional[List[Detection]]:
         raise NotImplementedError
+    
+    def run(self):
+        """Start the detector process"""
+        self._process = Process(target=self._run)
+        self._process.start()
 
+    def instantiate_model(self):
+        """Instantiate the model"""
+        pass
+
+    def _run(self):
+        # instantiate detection model
+        self.instantiate_model()
+        while True:
+            frame = self._event_manager_connection.recv()
+            self.detect(frame)
 
 class SimpleMotionDetector(Detector):
     """Simple motion detector that compares the current frame with the previous frame"""
@@ -152,8 +171,8 @@ class SimpleMotionDetector(Detector):
         if len(rects) > 0 and self._motion_frames < self._activation_frames:
             self._motion_frames += 1
         if len(rects) > 0 and self._motion_frames >= self._activation_frames:
-            if self._event_manager is not None:
-                self._event_manager.notify("detection", self._detections)
+            if self._event_manager_connection is not None:
+                self._event_manager_connection.send(('detection', self._detections))
             self._motion_frames = 0
             output = self._detections.copy()
             self._detections = []
@@ -166,7 +185,6 @@ class SimpleMotionDetector(Detector):
         return None
 
 
-# Adjust this to detector interface
 class BirdDetectorYolov5(Detector):
     def __init__(
         self,
@@ -176,11 +194,11 @@ class BirdDetectorYolov5(Detector):
         iou_threhsold: float = 0.45,
     ) -> None:
         super().__init__()
-        # Load model
-        self._device = select_device("")
-        self._model = self._load_model(model_path)
-        self._classes = self._model.names
-        self._stride = self._model.stride
+        self._model_path = model_path
+        self._device = None
+        self._model = None
+        self._classes = None
+        self._stride = None
         self._image_size = image_size
         self._confidence_threshold = confidence_threshold
         self._iou_threhsold = iou_threhsold
@@ -190,6 +208,13 @@ class BirdDetectorYolov5(Detector):
         # model = torch.hub.load('ultralytics/yolov5', 'custom', path=model_path, force_reload=False)
         model.to(self._device)
         return model
+
+    def instantiate_model(self):
+        self._device = select_device("")
+        self._model = self._load_model(self._model_path)
+        self._stride = self._model.stride
+        self._classes = self._model.names
+        self._model = self._load_model(self._model_path)
 
     def _extract_birds_from_prediction(self, prediction):
         return [self._classes[int(i)] for i in prediction.numpy()[:, -1]]
@@ -222,6 +247,8 @@ class BirdDetectorYolov5(Detector):
         return bbox_original
 
     def detect(self, frame: Frame) -> Optional[List[Detection]]:
+        if self._model is None:
+            raise ValueError("Model not instantiated")
         if frame.image is None:
             return None
         original_size = frame.image.shape[1], frame.image.shape[0]
@@ -257,8 +284,8 @@ class BirdDetectorYolov5(Detector):
                     },
                 )
             ]
-            if self._event_manager is not None:
-                self._event_manager.notify("detection", detection)
+            if self._event_manager_connection is not None:
+                self._event_manager_connection.send(('detection', self._detections))
             return detection
 
     @staticmethod
@@ -337,8 +364,8 @@ class SingleClassSequenceDetector(Detector):
             self._rewrite_to_consensus()
             # copy output
             output = self._detections.copy()
-            if self._event_manager is not None:
-                self._event_manager.notify("detection", output)
+            if self._event_manager_connection is not None:
+                self._event_manager_connection.send(('detection', output))
             self._blank_detections()
             return output
 
@@ -370,16 +397,16 @@ class MotionActivatedSingleClassDetector(SingleClassSequenceDetector):
     def _set_slack(self, motion_detections: Optional[List[Detection]]):
         if motion_detections is not None:
             # log detection
-            self._event_manager.log(
-                "detection",
-                {
-                    "type": "motion",
-                    "detail": "Class detector activated",
-                    "timestamp": motion_detections[-1]
-                    .get("frame_timestamp")
-                    .isoformat(sep=" ", timespec="milliseconds"),
-                },
-                level=logging.DEBUG,
+            self._event_manager_connection.send(
+                ('log_request',
+                    ('detection', {
+                        "type": "motion",
+                        "detail": "Class detector activated",
+                        "timestamp": motion_detections[-1]
+                        .get("frame_timestamp")
+                        .isoformat(sep=" ", timespec="milliseconds"),
+                    }, logging.DEBUG)
+                    )
             )
             self._stop_detecting_in = self._slack
         elif self._stop_detecting_in > 0:

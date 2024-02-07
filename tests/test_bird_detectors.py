@@ -10,6 +10,7 @@ class TestBirdDetectorYolov5:
     @pytest.fixture(autouse=True)
     def setup(self):
         self.bird_detector = BirdDetectorYolov5("weights/bh_v1.onnx")
+        self.bird_detector.instantiate_model()
 
     def test_extract_birds_from_prediction(self):
         prediction = torch.tensor([[0, 0, 0, 0, 0.5, 1]])

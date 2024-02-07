@@ -2,6 +2,7 @@
 
 from abc import ABC, abstractmethod
 from typing import Optional
+from multiprocessing import Queue, Process, Pipe
 import logging
 from birdhub.logging import logger
 
@@ -37,8 +38,8 @@ class VideoEventManager(Mediator):
         self._effector = effector
         self._throttle_detection = throttle_detection
         self._detections_logged = 0
+        self._pipes = {}
         # register mediator object
-        self._stream.add_event_manager(self)
         if self._recorder is not None:
             self._recorder.add_event_manager(self)
         if self._detector is not None:
@@ -61,9 +62,10 @@ class VideoEventManager(Mediator):
             logger.log_event(event, message, level=level)
 
     def notify(self, event: str, data: object) -> None:
+        # TODO: this needs to be rewritten with pipes
         if event == "video_frame":
             if self._detector is not None:
-                self._detector.detect(data)
+                self._pipes["detector"].send(data)
             if self._recorder is not None:
                 self._recorder.register_frame(
                     data
@@ -78,3 +80,32 @@ class VideoEventManager(Mediator):
             self.log("effect_activated", data.get("meta_information", None))
             if self._recorder is not None:
                 self._recorder.register_effect_activation(data)
+        if event == 'log_request':
+            log_event, message, level = data
+            self.log(log_event, message, level)
+    
+    def register_pipe(self, name:str, pipe:Pipe):
+        """Registers pipe with event manager."""
+        self._pipes[name] = pipe
+
+    def run(self):
+        """Start orchestration loop and notify components about events."""
+        event_queue = Queue()
+        log_queue = Queue()
+        # start all components
+        self._stream.run(event_queue, log_queue)
+        if self._detector is not None:
+            self._detector.run()
+        while True:
+            # check stream
+            if not event_queue.empty():
+                event, data = event_queue.get()
+                self.notify(event, data)
+            if not log_queue.empty():
+                event, message = log_queue.get()
+                self.log(event, message)
+            # check pipes
+            for pipe in self._pipes.values():
+                if pipe.poll():
+                    event, data = pipe.recv()
+                    self.notify(event, data)

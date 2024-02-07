@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 from birdhub.detection import MotionActivatedSingleClassDetector
 
 
@@ -10,6 +10,9 @@ def detectors():
     motion_detector = MagicMock()
     return detector, motion_detector
 
+@pytest.fixture
+def mock_pipe_connection():
+    return MagicMock(), MagicMock()
 
 @pytest.fixture
 def frame():
@@ -31,56 +34,59 @@ def test_no_motion_no_detection(detectors, frame):
     detector.detect.assert_not_called()
 
 
-def test_motion_detected(detectors, frame):
+def test_motion_detected(detectors, frame, mock_pipe_connection):
     """Test that the detector is called if motion is detected."""
-    detector, motion_detector = detectors
-    motion_detections = [MagicMock()]
-    motion_detector.detect.return_value = motion_detections
-    detector.detect.return_value = motion_detections
+    with patch("birdhub.detection.Pipe", return_value=mock_pipe_connection):
+        detector, motion_detector = detectors
+        motion_detections = [MagicMock()]
+        motion_detector.detect.return_value = motion_detections
+        detector.detect.return_value = motion_detections
 
-    motion_activated_detector = MotionActivatedSingleClassDetector(
-        detector, motion_detector
-    )
-    motion_activated_detector.add_event_manager(MagicMock())
-    motion_activated_detector.detect(frame)
+        motion_activated_detector = MotionActivatedSingleClassDetector(
+            detector, motion_detector
+        )
+        motion_activated_detector.add_event_manager(MagicMock())
+        motion_activated_detector.detect(frame)
 
-    detector.detect.assert_called_once_with(frame)
+        detector.detect.assert_called_once_with(frame)
 
 
-def test_slack_time_no_motion(detectors, frame):
+def test_slack_time_no_motion(detectors, frame, mock_pipe_connection):
     """Test that the detector is called if slack is larger than 0 and no motion is detected."""
-    detector, motion_detector = detectors
-    motion_detections = [MagicMock()]
-    motion_detector.detect.side_effect = [motion_detections, None]
-    detector.detect.return_value = motion_detections
+    with patch("birdhub.detection.Pipe", return_value=mock_pipe_connection):
+        detector, motion_detector = detectors
+        motion_detections = [MagicMock()]
+        motion_detector.detect.side_effect = [motion_detections, None]
+        detector.detect.return_value = motion_detections
 
-    motion_activated_detector = MotionActivatedSingleClassDetector(
-        detector, motion_detector, slack=10
-    )
-    motion_activated_detector.add_event_manager(MagicMock())
-    motion_activated_detector.detect(frame)
-    detector.detect.assert_called_once_with(frame)
-    detector.reset_mock()
+        motion_activated_detector = MotionActivatedSingleClassDetector(
+            detector, motion_detector, slack=10
+        )
+        motion_activated_detector.add_event_manager(MagicMock())
+        motion_activated_detector.detect(frame)
+        detector.detect.assert_called_once_with(frame)
+        detector.reset_mock()
 
-    motion_activated_detector.detect(frame)
-    detector.detect.assert_called_once_with(frame)
+        motion_activated_detector.detect(frame)
+        detector.detect.assert_called_once_with(frame)
 
 
-def test_reset_after_slack_expired(detectors, frame):
+def test_reset_after_slack_expired(detectors, frame, mock_pipe_connection):
     """test that detector is reset after slack time has expired"""
-    detector, motion_detector = detectors
-    motion_detections = [MagicMock()]
-    motion_detector.detect.side_effect = [motion_detections, None]
-    detector.detect.return_value = motion_detections
+    with patch("birdhub.detection.Pipe", return_value=mock_pipe_connection):
+        detector, motion_detector = detectors
+        motion_detections = [MagicMock()]
+        motion_detector.detect.side_effect = [motion_detections, None]
+        detector.detect.return_value = motion_detections
 
-    motion_activated_detector = MotionActivatedSingleClassDetector(
-        detector, motion_detector, slack=0
-    )
-    motion_activated_detector.add_event_manager(MagicMock())
-    motion_activated_detector.detect(frame)
-    detector.detect.assert_called_once_with(frame)
-    detector.reset_mock()
+        motion_activated_detector = MotionActivatedSingleClassDetector(
+            detector, motion_detector, slack=0
+        )
+        motion_activated_detector.add_event_manager(MagicMock())
+        motion_activated_detector.detect(frame)
+        detector.detect.assert_called_once_with(frame)
+        detector.reset_mock()
 
-    motion_activated_detector.detect(frame)
-    detector.detect.assert_not_called()
-    assert len(motion_activated_detector._detections) == 0
+        motion_activated_detector.detect(frame)
+        detector.detect.assert_not_called()
+        assert len(motion_activated_detector._detections) == 0

@@ -2,6 +2,7 @@
 import datetime
 import logging
 from typing import Optional
+from multiprocessing import Queue, Process
 import cv2
 import numpy as np
 import torch
@@ -30,7 +31,7 @@ class Stream:
         self, streamurl, ocr_weights="../weights/ocr_v3.pt", write_timestamps=True
     ):
         self.streamurl = streamurl
-        self.cap = cv2.VideoCapture(self.streamurl)
+        self.cap = None
         self._event_manager = None
         self._previous_timestamp = None
         self._frame_index = 0
@@ -39,21 +40,23 @@ class Stream:
             torch.load(ocr_weights, map_location=torch.device("cpu"))
         )
         self._write_timestamps = write_timestamps
+        self._process = None
 
     def get_frame(self):
         ret, frame = self.cap.read()
-        if self._frame_index % 10 == 0:
-            timestamp = self._get_timestamp(frame)
-            if timestamp is None:
-                timestamp = self._previous_timestamp
-            self._previous_timestamp = timestamp
-            self._frame_index = 0
-        else:
-            # add index to microsecond part of timestamp to make it unique
-            timestamp = self._previous_timestamp + datetime.timedelta(
-                microseconds=self._frame_index
-            )
-        self._frame_index += 1
+        timestamp = self._get_timestamp(frame)
+        # if self._frame_index % 10 == 0:
+        #     timestamp = self._get_timestamp(frame)
+        #     if timestamp is None:
+        #         timestamp = self._previous_timestamp
+        #     self._previous_timestamp = timestamp
+        #     self._frame_index = 0
+        # else:
+        #     # add index to microsecond part of timestamp to make it unique
+        #     timestamp = self._previous_timestamp + datetime.timedelta(
+        #         microseconds=self._frame_index
+        #     )
+        # self._frame_index += 1
         frame = Frame(frame, timestamp, datetime.datetime.now())
         if self._write_timestamps:
             self._write_timestamp(frame)
@@ -61,7 +64,7 @@ class Stream:
 
     def _get_timestamp(self, frame):
         try:
-            timestamp = self._digit_model.get_timestamp(frame)
+            timestamp = datetime.datetime.now()
         except ValueError as e:
             self._event_manager.log("timestamp_error", None, level=logging.INFO)
             logger.warning("Could not extract timestamp from frame: {}".format(e))
@@ -74,15 +77,26 @@ class Stream:
             timestamp = None
         return timestamp
 
-    def add_event_manager(self, event_manager: Mediator):
-        self._event_manager = event_manager
+    def run(self, event_queue: Queue, log_queue: Queue):
+        """Start the stream and add new frames to the queue."""
+        self._process = Process(target=self._run, args=(event_queue, log_queue))
+        self._process.start()
+
+    def _run(self, event_queue: Queue, log_queue: Queue):
+        """Start the stream and add new frames to the queue."""
+        # initialize stream
+        self.cap = cv2.VideoCapture(self.streamurl)
+        print(self.frameSize)
+        log_queue.put(("stream_started", None))
+        while True:
+            event_queue.put(("video_frame",self.get_frame()))
 
     def _write_timestamp(self, frame):
         if frame.timestamp is None:
             return
         cv2.putText(
             frame.image,
-            "O: " + frame.timestamp.strftime("%H:%M:%S,%f"),
+            "O: " + frame.timestamp.strftime("%H:%M:%S"),
             (10, 70),
             cv2.FONT_HERSHEY_SIMPLEX,
             1,
@@ -100,11 +114,6 @@ class Stream:
             2,
             cv2.LINE_AA,
         )
-
-    def stream(self):
-        self._event_manager.log("stream_started", None)
-        while True:
-            self._event_manager.notify("video_frame", self.get_frame())
 
     def __enter__(self):
         return self

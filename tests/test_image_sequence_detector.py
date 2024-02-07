@@ -43,6 +43,10 @@ def empty_array():
 def mock_event_manager():
     return MagicMock()
 
+@pytest.fixture
+def mock_pipe_connection():
+    return MagicMock(), MagicMock()
+
 
 def test_single_class_sequence_detector_obeys_threshold(
     small_sequence_detector, mock_event_manager, empty_array
@@ -56,29 +60,33 @@ def test_single_class_sequence_detector_obeys_threshold(
 
 
 def test_single_class_sequence_has_reached_consensus(
-    long_sequence_detector, mock_event_manager, empty_array
+    long_sequence_detector, mock_event_manager, mock_pipe_connection, empty_array
 ):
-    seq = SingleClassSequenceDetector(
-        minimum_number_detections=5, detector=long_sequence_detector
-    )
-    seq.add_event_manager(mock_event_manager)
-    result = seq.detect(empty_array)
-    assert result[0].get("meta_information")["most_likely_object"] == "tiger"
-    mock_event_manager.notify.assert_called()
+    connection, child_connection = mock_pipe_connection
+    with patch("birdhub.detection.Pipe", return_value=(connection, child_connection)):
+        seq = SingleClassSequenceDetector(
+            minimum_number_detections=5, detector=long_sequence_detector
+        )
+        seq.add_event_manager(mock_event_manager)
+        result = seq.detect(empty_array)
+        assert result[0].get("meta_information")["most_likely_object"] == "tiger"
+        connection.send.assert_called()
 
 
 def test_single_class_sequence_detector_resets_after_detection(
-    small_sequence_detector, mock_event_manager, empty_array
+    small_sequence_detector, mock_event_manager, mock_pipe_connection, empty_array
 ):
-    seq = SingleClassSequenceDetector(
-        minimum_number_detections=3, detector=small_sequence_detector
-    )
-    seq.add_event_manager(mock_event_manager)
-    seq.detect(empty_array)
-    result = seq.detect(empty_array)
-    assert result[0].get("meta_information")["most_likely_object"] == "dog"
-    mock_event_manager.notify.assert_called()
-    # check that further detections are not emitted
-    mock_event_manager.reset_mock()
-    seq.detect(empty_array)
-    mock_event_manager.notify.assert_not_called()
+    connection, child_connection = mock_pipe_connection
+    with patch("birdhub.detection.Pipe", return_value=(connection, child_connection)):
+        seq = SingleClassSequenceDetector(
+            minimum_number_detections=3, detector=small_sequence_detector
+        )
+        seq.add_event_manager(mock_event_manager)
+        seq.detect(empty_array)
+        result = seq.detect(empty_array)
+        assert result[0].get("meta_information")["most_likely_object"] == "dog"
+        connection.send.assert_called()
+        # check that further detections are not emitted
+        connection.reset_mock()
+        seq.detect(empty_array)
+        connection.send.assert_not_called()
