@@ -1,17 +1,16 @@
 """Classes for motion detection"""
 import cv2
 from abc import ABC, abstractmethod
-from typing import List, Optional, Dict, Union, Tuple
+from typing import List, Optional, Dict, Tuple
 from datetime import datetime
 import numpy as np
 import torch
-import numpy as np
 import logging
-from multiprocessing import Pipe, Process, Queue
+from multiprocessing import Pipe, Process
 from PIL import Image, ImageDraw, ImageFont
-from yolov5.models.common import DetectMultiBackend
-from yolov5.utils.general import non_max_suppression
-from yolov5.utils.torch_utils import select_device
+from birdhub.yolo_utils import DetectMultiBackend
+from birdhub.yolo_utils import non_max_suppression
+from birdhub.yolo_utils import select_device
 from birdhub.orchestration import Mediator
 from birdhub.video import Frame
 
