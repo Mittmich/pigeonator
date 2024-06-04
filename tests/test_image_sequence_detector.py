@@ -43,6 +43,7 @@ def empty_array():
 def mock_event_manager():
     return MagicMock()
 
+
 @pytest.fixture
 def mock_pipe_connection():
     return MagicMock(), MagicMock()

@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 from birdhub.detection import SimpleMotionDetector
 from birdhub.video import Frame
 
+
 @pytest.fixture
 def mock_pipe_connection():
     return MagicMock(), MagicMock()

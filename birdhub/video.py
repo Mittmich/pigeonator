@@ -89,7 +89,7 @@ class Stream:
         print(self.frameSize)
         log_queue.put(("stream_started", None))
         while True:
-            event_queue.put(("video_frame",self.get_frame()))
+            event_queue.put(("video_frame", self.get_frame()))
 
     def _write_timestamp(self, frame):
         if frame.timestamp is None:

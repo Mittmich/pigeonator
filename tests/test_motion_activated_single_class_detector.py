@@ -10,9 +10,11 @@ def detectors():
     motion_detector = MagicMock()
     return detector, motion_detector
 
+
 @pytest.fixture
 def mock_pipe_connection():
     return MagicMock(), MagicMock()
+
 
 @pytest.fixture
 def frame():

@@ -65,7 +65,7 @@ class Detector(ABC):
     @abstractmethod
     def detect(self, frame: Frame) -> Optional[List[Detection]]:
         raise NotImplementedError
-    
+
     def run(self):
         """Start the detector process"""
         self._process = Process(target=self._run)
@@ -81,6 +81,7 @@ class Detector(ABC):
         while True:
             frame = self._event_manager_connection.recv()
             self.detect(frame)
+
 
 class SimpleMotionDetector(Detector):
     """Simple motion detector that compares the current frame with the previous frame"""
@@ -171,7 +172,7 @@ class SimpleMotionDetector(Detector):
             self._motion_frames += 1
         if len(rects) > 0 and self._motion_frames >= self._activation_frames:
             if self._event_manager_connection is not None:
-                self._event_manager_connection.send(('detection', self._detections))
+                self._event_manager_connection.send(("detection", self._detections))
             self._motion_frames = 0
             output = self._detections.copy()
             self._detections = []
@@ -284,7 +285,7 @@ class BirdDetectorYolov5(Detector):
                 )
             ]
             if self._event_manager_connection is not None:
-                self._event_manager_connection.send(('detection', self._detections))
+                self._event_manager_connection.send(("detection", self._detections))
             return detection
 
     @staticmethod
@@ -364,7 +365,7 @@ class SingleClassSequenceDetector(Detector):
             # copy output
             output = self._detections.copy()
             if self._event_manager_connection is not None:
-                self._event_manager_connection.send(('detection', output))
+                self._event_manager_connection.send(("detection", output))
             self._blank_detections()
             return output
 
@@ -397,15 +398,20 @@ class MotionActivatedSingleClassDetector(SingleClassSequenceDetector):
         if motion_detections is not None:
             # log detection
             self._event_manager_connection.send(
-                ('log_request',
-                    ('detection', {
-                        "type": "motion",
-                        "detail": "Class detector activated",
-                        "timestamp": motion_detections[-1]
-                        .get("frame_timestamp")
-                        .isoformat(sep=" ", timespec="milliseconds"),
-                    }, logging.DEBUG)
-                    )
+                (
+                    "log_request",
+                    (
+                        "detection",
+                        {
+                            "type": "motion",
+                            "detail": "Class detector activated",
+                            "timestamp": motion_detections[-1]
+                            .get("frame_timestamp")
+                            .isoformat(sep=" ", timespec="milliseconds"),
+                        },
+                        logging.DEBUG,
+                    ),
+                )
             )
             self._stop_detecting_in = self._slack
         elif self._stop_detecting_in > 0:

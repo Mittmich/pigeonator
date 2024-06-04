@@ -80,11 +80,11 @@ class VideoEventManager(Mediator):
             self.log("effect_activated", data.get("meta_information", None))
             if self._recorder is not None:
                 self._recorder.register_effect_activation(data)
-        if event == 'log_request':
+        if event == "log_request":
             log_event, message, level = data
             self.log(log_event, message, level)
-    
-    def register_pipe(self, name:str, pipe:Pipe):
+
+    def register_pipe(self, name: str, pipe: Pipe):
         """Registers pipe with event manager."""
         self._pipes[name] = pipe
 
