@@ -192,6 +192,7 @@ class BirdDetectorYolov5(Detector):
         image_size: Tuple[int] = (640, 640),
         confidence_threshold: float = 0.25,
         iou_threhsold: float = 0.45,
+        max_delay: int = 10 # in seconds
     ) -> None:
         super().__init__()
         self._model_path = model_path
@@ -202,6 +203,7 @@ class BirdDetectorYolov5(Detector):
         self._image_size = image_size
         self._confidence_threshold = confidence_threshold
         self._iou_threhsold = iou_threhsold
+        self._max_delay = max_delay
 
     def _load_model(self, model_path):
         model = DetectMultiBackend(model_path, device=self._device)
@@ -214,7 +216,6 @@ class BirdDetectorYolov5(Detector):
         self._model = self._load_model(self._model_path)
         self._stride = self._model.stride
         self._classes = self._model.names
-        self._model = self._load_model(self._model_path)
 
     def _extract_birds_from_prediction(self, prediction):
         return [self._classes[int(i)] for i in prediction.numpy()[:, -1]]
@@ -250,6 +251,11 @@ class BirdDetectorYolov5(Detector):
         if self._model is None:
             raise ValueError("Model not instantiated")
         if frame.image is None:
+            return None
+        # check for delay and drop frame if delay is too high
+        current_time = datetime.now()
+        if (current_time - frame.timestamp).seconds > self._max_delay:
+            print("dropped")
             return None
         original_size = frame.image.shape[1], frame.image.shape[0]
         resized = cv2.resize(frame.image, (self._image_size))
@@ -376,6 +382,10 @@ class SingleClassSequenceDetector(Detector):
         if self._number_detections < self._minimum_number_detections:
             return None
         return max(self._object_detections, key=self._object_detections.get)
+    
+    def instantiate_model(self):
+        """Delegate model instantiation to the detector."""
+        self._detector.instantiate_model()
 
 
 class MotionActivatedSingleClassDetector(SingleClassSequenceDetector):
@@ -430,3 +440,8 @@ class MotionActivatedSingleClassDetector(SingleClassSequenceDetector):
                 # Think about whether we want to reset the detector here -> this effectively means that we only detect one object per motion event
                 self._blank_detections()
                 return result
+    
+    def instantiate_model(self):
+        """Delegate model instantiation to the two detector."""
+        self._detector.instantiate_model()
+        self._motion_detector.instantiate_model()

@@ -2,10 +2,11 @@
 from abc import ABC, abstractmethod
 import os
 from datetime import datetime, timedelta
+import logging
 import cv2
-from typing import List, Tuple, Optional, Union
+from typing import List, Tuple
+from multiprocessing import Pipe, Process
 import numpy as np
-from PIL import Image, ImageDraw, ImageFont
 from birdhub.video import VideoWriter, Frame
 from birdhub.orchestration import Mediator
 from birdhub.detection import Detection
@@ -33,7 +34,22 @@ class Recorder(ABC):
         return os.path.join(self._outputDir, f"{self._get_timestamp()}.avi")
 
     def add_event_manager(self, event_manager: Mediator):
-        self._event_manager = event_manager
+        # create commuinication pipe
+        self._event_manager_connection, child_connection = Pipe()
+        # register pipe with event manager
+        event_manager.register_pipe("recorder", child_connection)
+
+    def run(self):
+        """Start the detector process"""
+        self._process = Process(target=self._run)
+        self._process.start()
+
+    def _run(self):
+        while True:
+            data = self._event_manager_connection.recv()
+            # check if data is a frame or detection
+            if isinstance(data, Frame):
+                self.register_frame(data)
 
     @abstractmethod
     def register_frame(self, frame: Frame):
@@ -219,7 +235,17 @@ class EventRecorder(Recorder):
             self._update_detections(detection_data)
             self._look_back_frames = []
         else:
-            self._event_manager.log("recording_started", "event recording started")
+            # log detection
+            self._event_manager_connection.send(
+                (
+                    "log_request",
+                    (
+                        "recording_started",
+                        "event recording started",
+                        logging.INFO,
+                    ),
+                )
+            )
             self._writer = self._writer_factory(
                 self._get_recording_output_file(), self._fps, self._frame_size
             )
@@ -231,3 +257,16 @@ class EventRecorder(Recorder):
             self._update_detections(detection_data)
             self._look_back_frames = []
             self._recording = True
+    
+    def _run(self):
+        while True:
+            data = self._event_manager_connection.recv()
+            # check data type
+            if isinstance(data, Frame):
+                self.register_frame(data)
+            elif isinstance(data, list):
+                # list of detections
+                self.register_detection(data)
+            elif isinstance(data, dict):
+                # activation data
+                self.register_effect_activation(data)

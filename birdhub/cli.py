@@ -134,14 +134,14 @@ def deter(
         cooldown_time=timedelta(seconds=10),
         config={"sound_file": sound_path},
     )
-    VideoEventManager(
+    event_manager = VideoEventManager(
         stream=stream,
         recorder=recorder,
         detector=motion_activated_detector,
         throttle_detection=1,
         effector=effector,
     )
-    stream.stream()
+    event_manager.run()
 
 
 record.add_command(motion)

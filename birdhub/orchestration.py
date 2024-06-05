@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 from typing import Optional
-from multiprocessing import Queue, Process, Pipe
+from multiprocessing import Queue, Pipe
 import logging
 from birdhub.logging import logger
 
@@ -62,18 +62,15 @@ class VideoEventManager(Mediator):
             logger.log_event(event, message, level=level)
 
     def notify(self, event: str, data: object) -> None:
-        # TODO: this needs to be rewritten with pipes
         if event == "video_frame":
             if self._detector is not None:
                 self._pipes["detector"].send(data)
             if self._recorder is not None:
-                self._recorder.register_frame(
-                    data
-                )  # This is needed for lookback recording
+                self._pipes["recorder"].send(data)
         if event == "detection":
             self.log("detection", data[-1].get("meta_information", None))
             if self._recorder is not None:
-                self._recorder.register_detection(data)
+                self._pipes["recorder"].send(data)
             if self._effector is not None:
                 self._pipes["effector"].send(data)
         if event == "effect_activated":
@@ -96,6 +93,10 @@ class VideoEventManager(Mediator):
         self._stream.run(event_queue, log_queue)
         if self._detector is not None:
             self._detector.run()
+        if self._recorder is not None:
+            self._recorder.run()
+        if self._effector is not None:
+            self._effector.run()
         while True:
             # check stream
             if not event_queue.empty():

@@ -41,6 +41,15 @@ class Stream:
         )
         self._write_timestamps = write_timestamps
         self._process = None
+        # start and stop stream to get frame size
+        self.cap = cv2.VideoCapture(self.streamurl)
+        self._frameSize = (
+            int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
+            int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)),
+        )
+        self.cap.release()
+        self.cap = None
+
 
     def get_frame(self):
         ret, frame = self.cap.read()
@@ -127,10 +136,7 @@ class Stream:
 
     @property
     def frameSize(self):
-        return (
-            int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
-            int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)),
-        )
+        return self._frameSize
 
     def __iter__(self):
         return self
