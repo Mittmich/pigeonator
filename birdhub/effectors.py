@@ -23,7 +23,7 @@ class Effector(ABC):
         # create commuinication pipe
         self._event_manager_connection, child_connection = Pipe()
         # register pipe with event manager
-        event_manager.register_pipe("detector", child_connection)
+        event_manager.register_pipe("effector", child_connection)
 
     def run(self):
         """Start the detector process"""

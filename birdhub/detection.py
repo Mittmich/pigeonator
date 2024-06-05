@@ -79,8 +79,9 @@ class Detector(ABC):
         # instantiate detection model
         self.instantiate_model()
         while True:
-            frame = self._event_manager_connection.recv()
-            self.detect(frame)
+            if self._event_manager_connection.poll(1):
+                frame = self._event_manager_connection.recv()
+                self.detect(frame)
 
 
 class SimpleMotionDetector(Detector):
@@ -255,7 +256,6 @@ class BirdDetectorYolov5(Detector):
         # check for delay and drop frame if delay is too high
         current_time = datetime.now()
         if (current_time - frame.timestamp).seconds > self._max_delay:
-            print("dropped")
             return None
         original_size = frame.image.shape[1], frame.image.shape[0]
         resized = cv2.resize(frame.image, (self._image_size))

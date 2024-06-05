@@ -222,7 +222,17 @@ class EventRecorder(Recorder):
             self._writer.write(frame.image)
             self._stop_recording_in -= 1
         elif self._writer is not None:
-            self._event_manager.log("recording_stopped", "event recording stopped")
+            # log end of recording
+            self._event_manager_connection.send(
+                (
+                    "log_request",
+                    (
+                        "recording_stopped",
+                        "event recording stopped",
+                        logging.INFO,
+                    ),
+                )
+            )
             # write detections
             self._update_detections([])
             self._write_detections()
@@ -235,7 +245,7 @@ class EventRecorder(Recorder):
             self._update_detections(detection_data)
             self._look_back_frames = []
         else:
-            # log detection
+            # log start of recording
             self._event_manager_connection.send(
                 (
                     "log_request",

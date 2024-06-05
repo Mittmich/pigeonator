@@ -3,6 +3,7 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 from multiprocessing import Queue, Pipe
+import time
 import logging
 from birdhub.logging import logger
 
@@ -76,7 +77,7 @@ class VideoEventManager(Mediator):
         if event == "effect_activated":
             self.log("effect_activated", data.get("meta_information", None))
             if self._recorder is not None:
-                self._recorder.register_effect_activation(data)
+                self._pipes["recorder"].send(data)
         if event == "log_request":
             log_event, message, level = data
             self.log(log_event, message, level)
