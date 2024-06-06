@@ -6,7 +6,7 @@ from datetime import datetime
 import numpy as np
 import torch
 import logging
-from multiprocessing import Pipe, Process
+from multiprocessing import Pipe
 from threading import Thread
 from PIL import Image, ImageDraw, ImageFont
 from birdhub.yolo_utils import DetectMultiBackend
@@ -14,6 +14,7 @@ from birdhub.yolo_utils import non_max_suppression
 from birdhub.yolo_utils import select_device
 from birdhub.orchestration import Mediator
 from birdhub.video import Frame
+from birdhub.logging import logger
 
 
 class Detection:
@@ -408,10 +409,7 @@ class MotionActivatedSingleClassDetector(SingleClassSequenceDetector):
     def _set_slack(self, motion_detections: Optional[List[Detection]]):
         if motion_detections is not None:
             # log detection
-            self._event_manager_connection.send(
-                (
-                    "log_request",
-                    (
+            logger.log_event(
                         "detection",
                         {
                             "type": "motion",
@@ -420,9 +418,7 @@ class MotionActivatedSingleClassDetector(SingleClassSequenceDetector):
                             .get("frame_timestamp")
                             .isoformat(sep=" ", timespec="milliseconds"),
                         },
-                        logging.DEBUG,
-                    ),
-                )
+                        logging.DEBUG
             )
             self._stop_detecting_in = self._slack
         elif self._stop_detecting_in > 0:

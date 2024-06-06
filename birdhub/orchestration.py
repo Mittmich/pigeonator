@@ -2,9 +2,10 @@
 
 from abc import ABC, abstractmethod
 from typing import Optional
-from multiprocessing import Queue, Pipe
-import time
-import logging
+import asyncio
+from asyncio import Queue
+from multiprocessing import Pipe
+from datetime import timedelta, datetime
 from birdhub.logging import logger
 
 
@@ -14,10 +15,6 @@ class Mediator(ABC):
     mediator about various events. The Mediator may react to these events and
     pass the execution to other components.
     """
-
-    @abstractmethod
-    def log(self, event: str, message: Optional[str] = None) -> None:
-        pass
 
     @abstractmethod
     def notify(self, event: str, data: object) -> None:
@@ -31,15 +28,16 @@ class VideoEventManager(Mediator):
         recorder: Optional["Recorder"] = None,
         detector: Optional["Detector"] = None,
         effector: Optional["Effector"] = None,
-        throttle_detection: int = 10,
+        max_delay: int = 5 # seconds
     ) -> None:
         self._stream = stream
         self._recorder = recorder
         self._detector = detector
         self._effector = effector
-        self._throttle_detection = throttle_detection
         self._detections_logged = 0
         self._pipes = {}
+        self._event_queue = None
+        self._max_delay = max_delay
         # register mediator object
         if self._recorder is not None:
             self._recorder.add_event_manager(self)
@@ -48,66 +46,60 @@ class VideoEventManager(Mediator):
         if self._effector is not None:
             self._effector.add_event_manager(self)
 
-    def log(
-        self, event: str, message: Optional[str] = None, level=logging.INFO
-    ) -> None:
-        if event == "detection":
-            self._detections_logged += 1
-            if self._detections_logged % self._throttle_detection == 0:
-                message["accumulation_count"] = self._throttle_detection
-                logger.log_event(event, message, level=level)
-        elif event == "recording_stopped":
-            self._detections_logged = 0
-            logger.log_event(event, message, level=level)
-        else:
-            logger.log_event(event, message, level=level)
 
-    def notify(self, event: str, data: object) -> None:
+    async def notify(self, event: str, data: object) -> None:
         if event == "video_frame":
+            # drop frames if they are not recent
+            if datetime.now() - data.timestamp > timedelta(seconds=self._max_delay):
+                return
             if self._detector is not None:
                 self._pipes["detector"].send(data)
             if self._recorder is not None:
                 self._pipes["recorder"].send(data)
         if event == "detection":
-            self.log("detection", data[-1].get("meta_information", None))
+            logger.log_event("detection", data[-1].get("meta_information", None))
             if self._recorder is not None:
                 self._pipes["recorder"].send(data)
             if self._effector is not None:
                 self._pipes["effector"].send(data)
         if event == "effect_activated":
-            self.log("effect_activated", data.get("meta_information", None))
+            logger.log_event("effect_activated", data.get("meta_information", None))
             if self._recorder is not None:
                 self._pipes["recorder"].send(data)
-        if event == "log_request":
-            log_event, message, level = data
-            self.log(log_event, message, level)
 
     def register_pipe(self, name: str, pipe: Pipe):
         """Registers pipe with event manager."""
         self._pipes[name] = pipe
 
-    def run(self):
+    async def process_notify(self, event_queue: Queue):
+        """Notification worker"""
+        while True:
+            if not event_queue.empty():
+                event, data = await event_queue.get()
+                await self.notify(event, data)
+                event_queue.task_done()
+            # check pipes
+            for pipe in self._pipes.values():
+                if pipe.poll():
+                    event, data = pipe.recv()
+                    await self.notify(event, data)
+
+    async def run(self):
         """Start orchestration loop and notify components about events."""
-        event_queue = Queue()
-        log_queue = Queue()
+        self._event_queue = Queue(maxsize=500)
         # start all components
-        self._stream.run(event_queue, log_queue)
+        self._stream.run(self._event_queue)
         if self._detector is not None:
             self._detector.run()
         if self._recorder is not None:
             self._recorder.run()
         if self._effector is not None:
             self._effector.run()
-        while True:
-            # check stream
-            if not event_queue.empty():
-                event, data = event_queue.get()
-                self.notify(event, data)
-            if not log_queue.empty():
-                event, message = log_queue.get()
-                self.log(event, message)
-            # check pipes
-            for pipe in self._pipes.values():
-                if pipe.poll():
-                    event, data = pipe.recv()
-                    self.notify(event, data)
+        # start workers
+        tasks = [
+            asyncio.create_task(self.process_notify(self._event_queue)),
+            asyncio.create_task(self.process_notify(self._event_queue)),
+            asyncio.create_task(self.process_notify(self._event_queue)),
+        ]
+        # await queue workers
+        await asyncio.gather(*tasks)

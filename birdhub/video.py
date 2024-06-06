@@ -1,8 +1,9 @@
 """A module to handle video streams and video files."""
+import asyncio
+from asyncio import Queue
 import datetime
 import logging
 from typing import Optional
-from multiprocessing import Queue, Process
 import cv2
 import numpy as np
 import torch
@@ -87,19 +88,25 @@ class Stream:
             timestamp = None
         return timestamp
 
-    def run(self, event_queue: Queue, log_queue: Queue):
+    def run(self, event_queue: Queue):
         """Start the stream and add new frames to the queue."""
-        self._process = Thread(target=self._run, args=(event_queue, log_queue))
+        self._process = Thread(target=self._async_wrapper, args=(event_queue,))
         self._process.start()
 
-    def _run(self, event_queue: Queue, log_queue: Queue):
+    def _async_wrapper(self, event_queue: Queue):
+        """Start the stream and add new frames to the queue."""
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(self._run(event_queue))
+        loop.close()
+
+    async def _run(self, event_queue: Queue):
         """Start the stream and add new frames to the queue."""
         # initialize stream
         self.cap = cv2.VideoCapture(self.streamurl)
-        print(self.frameSize)
-        log_queue.put(("stream_started", None))
+        logger.log_event("stream_started", None, level=logging.INFO)
         while True:
-            event_queue.put(("video_frame", self.get_frame()))
+            await event_queue.put(("video_frame", self.get_frame()))
 
     def _write_timestamp(self, frame):
         if frame.timestamp is None:
