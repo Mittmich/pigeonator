@@ -3,6 +3,7 @@
 from abc import ABC, abstractmethod
 from typing import Optional, List, Dict
 from multiprocessing import Process, Pipe
+from threading import Thread
 from datetime import timedelta, datetime
 from playsound import playsound
 from birdhub.orchestration import Mediator
@@ -27,7 +28,7 @@ class Effector(ABC):
 
     def run(self):
         """Start the detector process"""
-        self._process = Process(target=self._run)
+        self._process = Thread(target=self._run)
         self._process.start()
 
     def _run(self):

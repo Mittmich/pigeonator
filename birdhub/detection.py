@@ -7,6 +7,7 @@ import numpy as np
 import torch
 import logging
 from multiprocessing import Pipe, Process
+from threading import Thread
 from PIL import Image, ImageDraw, ImageFont
 from birdhub.yolo_utils import DetectMultiBackend
 from birdhub.yolo_utils import non_max_suppression
@@ -68,7 +69,7 @@ class Detector(ABC):
 
     def run(self):
         """Start the detector process"""
-        self._process = Process(target=self._run)
+        self._process = Thread(target=self._run)
         self._process.start()
 
     def instantiate_model(self):

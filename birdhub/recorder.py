@@ -6,6 +6,7 @@ import logging
 import cv2
 from typing import List, Tuple
 from multiprocessing import Pipe, Process
+from threading import Thread
 import numpy as np
 from birdhub.video import VideoWriter, Frame
 from birdhub.orchestration import Mediator
@@ -41,7 +42,7 @@ class Recorder(ABC):
 
     def run(self):
         """Start the detector process"""
-        self._process = Process(target=self._run)
+        self._process = Thread(target=self._run)
         self._process.start()
 
     def _run(self):

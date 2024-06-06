@@ -7,6 +7,7 @@ import cv2
 import numpy as np
 import torch
 from birdhub.orchestration import Mediator
+from threading import Thread
 from birdhub.logging import logger
 from birdhub.timestamp_extraction import DigitModel
 
@@ -88,7 +89,7 @@ class Stream:
 
     def run(self, event_queue: Queue, log_queue: Queue):
         """Start the stream and add new frames to the queue."""
-        self._process = Process(target=self._run, args=(event_queue, log_queue))
+        self._process = Thread(target=self._run, args=(event_queue, log_queue))
         self._process.start()
 
     def _run(self, event_queue: Queue, log_queue: Queue):
