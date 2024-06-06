@@ -81,9 +81,8 @@ class Detector(ABC):
         # instantiate detection model
         self.instantiate_model()
         while True:
-            if self._event_manager_connection.poll(1):
-                frame = self._event_manager_connection.recv()
-                self.detect(frame)
+            frame = self._event_manager_connection.recv()
+            self.detect(frame)
 
 
 class SimpleMotionDetector(Detector):

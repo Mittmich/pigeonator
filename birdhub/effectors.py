@@ -34,7 +34,7 @@ class Effector(ABC):
     def _run(self):
         """Run the effector"""
         while True:
-            if self._event_manager_connection.poll(1):
+            if self._event_manager_connection.poll():
                 data = self._event_manager_connection.recv()
                 self.register_detection(data)
 
