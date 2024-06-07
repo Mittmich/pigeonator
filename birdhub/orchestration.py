@@ -6,7 +6,6 @@ import asyncio
 from asyncio import Queue
 from multiprocessing import Pipe
 from datetime import timedelta, datetime
-import logging
 from birdhub.logging import logger
 from birdhub.video import ImageStore
 

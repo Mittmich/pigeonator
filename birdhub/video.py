@@ -5,11 +5,12 @@ import datetime
 import logging
 from typing import Optional
 import cv2
+import os
 import numpy as np
 import torch
+from tempfile import TemporaryDirectory
+from pathlib import Path
 from cachetools import LRUCache
-from shelved_cache import PersistentCache
-from tempfile import NamedTemporaryFile
 from threading import Lock
 from threading import Thread
 from birdhub.logging import logger
@@ -33,13 +34,8 @@ class ImageStore:
     """Object that holds the a maximum number of for a given delay. Meant to be shared
     between one producer and multiple consumers."""
 
-    def __init__(self, number_images: int, persist=False):
-        if persist:
-            # create named temporary file
-            filename = NamedTemporaryFile().name
-            self._images = PersistentCache(LRUCache, filename=filename, maxsize=number_images)
-        else:
-            self._images = LRUCache(maxsize=number_images)
+    def __init__(self, number_images: int):
+        self._images = LRUCache(maxsize=number_images)
         self._lock = Lock()
     
     def put(self, timestamp: datetime.datetime, image: np.ndarray) -> None:
@@ -49,6 +45,76 @@ class ImageStore:
     def get(self, timestamp: datetime.datetime) -> Optional[np.ndarray]:
         with self._lock:
             return self._images.get(timestamp)
+
+class PersistedImageBuffer:
+    """Image buffer that persists images to disk above a certain maximum number of images.
+    Implements a LRUCache"""
+
+    def __init__(self, max_size_memory: int, chunk_size=50, ttl=100):
+        """Defines LRU cache for in-memory storage and disk storage"""
+        self._max_size_memory = max_size_memory
+        self._chunk_size = chunk_size
+        self._temp_dir = TemporaryDirectory()
+        self._images = LRUCache(maxsize=self._max_size_memory*2)
+        self._disk_index_map = {}
+        self._temp_file_count = 0
+        self._lock = Lock()
+        self._ttl = ttl
+    
+    def _write_to_disk(self):
+        # create file
+        file_name = str(Path(self._temp_dir.name) / f'temp{self._temp_file_count}.npy')
+        output_arrays = []
+        # get output size
+        output_size = min(self._chunk_size, len(self._images))
+        for i in range(output_size):
+            timestamp, image = self._images.popitem()
+            self._disk_index_map[timestamp] = (file_name, i)
+            output_arrays.append(image)
+        # stack images
+        output_array = np.stack(output_arrays, axis=0)
+        # write to disk
+        np.save(file_name, output_array)
+        # increment file count
+        self._temp_file_count += 1
+        # delete disk cache if it is older than ttl
+        self._delete_old_files()
+
+    def _delete_old_files(self):
+        """Deletes files that are older than ttl."""
+        timestamps_to_delete = []
+        for timestamp, (file_name, _) in self._disk_index_map.items():
+            if datetime.datetime.now() - timestamp > datetime.timedelta(seconds=self._ttl):
+                if Path(file_name).exists():
+                    os.remove(file_name)
+                timestamps_to_delete.append(timestamp)
+        for timestamp in timestamps_to_delete:
+            del self._disk_index_map[timestamp]
+
+    def _read_from_disk(self, timestamp: datetime.datetime) -> Optional[np.ndarray]:
+        if timestamp not in self._disk_index_map:
+            return None
+        file_name, i = self._disk_index_map[timestamp]
+        output_array = np.load(file_name, mmap_mode='r')
+        return output_array[i, :]
+
+    def put(self, timestamp: datetime.datetime, image: np.ndarray) -> None:
+        with self._lock:
+            # check if cache is full
+            if len(self._images) >= self._max_size_memory:
+                # if full, write to disk
+                self._write_to_disk()
+            self._images[timestamp] = image
+
+    def get(self, timestamp: datetime.datetime) -> Optional[np.ndarray]:
+        with self._lock:
+            # check if image is in memory
+            if timestamp in self._images:
+                return self._images[timestamp]
+            else:
+                # check if image is on disk
+                return self._read_from_disk(timestamp)
+
 
 
 class Stream:

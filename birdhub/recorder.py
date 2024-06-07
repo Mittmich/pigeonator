@@ -8,7 +8,7 @@ from typing import List, Tuple
 from multiprocessing import Pipe
 from threading import Thread
 import numpy as np
-from birdhub.video import VideoWriter, Frame, ImageStore
+from birdhub.video import VideoWriter, Frame, ImageStore, PersistedImageBuffer
 from birdhub.orchestration import Mediator
 from birdhub.detection import Detection
 from birdhub.logging import logger
@@ -109,7 +109,7 @@ class EventRecorder(Recorder):
         self._stop_recording_in = 0
         self._detection_writer_factory = detection_writer_factory
         # instantiate detection image buffer that is persisted to disk
-        self._detection_image_buffer = ImageStore(number_images=slack*10, persist=True)
+        self._detection_image_buffer = PersistedImageBuffer(max_size_memory=slack)
         self._detection_frame_buffer = []
         self._detections = []
         self._recording = False
@@ -165,7 +165,7 @@ class EventRecorder(Recorder):
             self._look_back_frames = self._look_back_frames[
                 -self._look_back_frames_limit :
             ]
-        # dettection image buffer should be bounded by slack
+        # dettection frame buffer should be bounded by slack
         if len(self._detection_frame_buffer) > self._slack:
             self._detection_frame_buffer = self._detection_frame_buffer[-self._slack :]
 
