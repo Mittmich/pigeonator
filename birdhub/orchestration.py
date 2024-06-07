@@ -6,7 +6,9 @@ import asyncio
 from asyncio import Queue
 from multiprocessing import Pipe
 from datetime import timedelta, datetime
+import logging
 from birdhub.logging import logger
+from birdhub.video import ImageStore
 
 
 class Mediator(ABC):
@@ -28,6 +30,7 @@ class VideoEventManager(Mediator):
         recorder: Optional["Recorder"] = None,
         detector: Optional["Detector"] = None,
         effector: Optional["Effector"] = None,
+        max_buffer_size: int = 500,
         max_delay: int = 5 # seconds
     ) -> None:
         self._stream = stream
@@ -38,6 +41,7 @@ class VideoEventManager(Mediator):
         self._pipes = {}
         self._event_queue = None
         self._max_delay = max_delay
+        self._image_store = ImageStore(number_images=max_buffer_size)
         # register mediator object
         if self._recorder is not None:
             self._recorder.add_event_manager(self)
@@ -49,6 +53,8 @@ class VideoEventManager(Mediator):
 
     async def notify(self, event: str, data: object) -> None:
         if event == "video_frame":
+            # log size of queue
+            #logger.log_event('queue_size', self._event_queue.qsize(), level=logging.DEBUG)
             # drop frames if they are not recent
             if datetime.now() - data.timestamp > timedelta(seconds=self._max_delay):
                 return
@@ -88,11 +94,11 @@ class VideoEventManager(Mediator):
         """Start orchestration loop and notify components about events."""
         self._event_queue = Queue(maxsize=500)
         # start all components
-        self._stream.run(self._event_queue)
+        self._stream.run(self._event_queue, self._image_store)
         if self._detector is not None:
-            self._detector.run()
+            self._detector.run(self._image_store)
         if self._recorder is not None:
-            self._recorder.run()
+            self._recorder.run(self._image_store)
         if self._effector is not None:
             self._effector.run()
         # start workers

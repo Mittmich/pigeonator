@@ -7,7 +7,10 @@ from typing import Optional
 import cv2
 import numpy as np
 import torch
-from birdhub.orchestration import Mediator
+from cachetools import LRUCache
+from shelved_cache import PersistentCache
+from tempfile import NamedTemporaryFile
+from threading import Lock
 from threading import Thread
 from birdhub.logging import logger
 from birdhub.timestamp_extraction import DigitModel
@@ -16,16 +19,36 @@ from birdhub.timestamp_extraction import DigitModel
 class Frame:
     def __init__(
         self,
-        image: np.ndarray,
         timestamp: datetime.datetime,
         capture_time: Optional[datetime.datetime] = None,
     ):
-        self.image = image
         self.timestamp = timestamp
         if capture_time is None:
             self.capture_time = datetime.datetime.now()
         else:
             self.capture_time = capture_time
+
+
+class ImageStore:
+    """Object that holds the a maximum number of for a given delay. Meant to be shared
+    between one producer and multiple consumers."""
+
+    def __init__(self, number_images: int, persist=False):
+        if persist:
+            # create named temporary file
+            filename = NamedTemporaryFile().name
+            self._images = PersistentCache(LRUCache, filename=filename, maxsize=number_images)
+        else:
+            self._images = LRUCache(maxsize=number_images)
+        self._lock = Lock()
+    
+    def put(self, timestamp: datetime.datetime, image: np.ndarray) -> None:
+        with self._lock:
+            self._images[timestamp] = image
+
+    def get(self, timestamp: datetime.datetime) -> Optional[np.ndarray]:
+        with self._lock:
+            return self._images.get(timestamp)
 
 
 class Stream:
@@ -53,9 +76,9 @@ class Stream:
         self.cap = None
 
 
-    def get_frame(self):
-        ret, frame = self.cap.read()
-        timestamp = self._get_timestamp(frame)
+    def get_frame(self, image_store: ImageStore):
+        ret, image = self.cap.read()
+        timestamp = self._get_timestamp(image)
         # if self._frame_index % 10 == 0:
         #     timestamp = self._get_timestamp(frame)
         #     if timestamp is None:
@@ -68,9 +91,12 @@ class Stream:
         #         microseconds=self._frame_index
         #     )
         # self._frame_index += 1
-        frame = Frame(frame, timestamp, datetime.datetime.now())
+        # create frame messag object
+        frame = Frame(timestamp, datetime.datetime.now())
         if self._write_timestamps:
-            self._write_timestamp(frame)
+            self._write_timestamp(frame, image)
+        # image to store
+        image_store.put(timestamp, image)
         return frame
 
     def _get_timestamp(self, frame):
@@ -88,31 +114,29 @@ class Stream:
             timestamp = None
         return timestamp
 
-    def run(self, event_queue: Queue):
+    def run(self, event_queue: Queue, image_store: ImageStore):
         """Start the stream and add new frames to the queue."""
-        self._process = Thread(target=self._async_wrapper, args=(event_queue,))
+        self._process = Thread(target=self._async_wrapper, args=(event_queue,image_store,))
         self._process.start()
 
-    def _async_wrapper(self, event_queue: Queue):
+    def _async_wrapper(self, event_queue: Queue, image_store: ImageStore):
         """Start the stream and add new frames to the queue."""
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        loop.run_until_complete(self._run(event_queue))
+        loop.run_until_complete(self._run(event_queue, image_store))
         loop.close()
 
-    async def _run(self, event_queue: Queue):
+    async def _run(self, event_queue: Queue, image_store: ImageStore):
         """Start the stream and add new frames to the queue."""
         # initialize stream
         self.cap = cv2.VideoCapture(self.streamurl)
         logger.log_event("stream_started", None, level=logging.INFO)
         while True:
-            await event_queue.put(("video_frame", self.get_frame()))
+            await event_queue.put(("video_frame", self.get_frame(image_store)))
 
-    def _write_timestamp(self, frame):
-        if frame.timestamp is None:
-            return
+    def _write_timestamp(self, frame, image):
         cv2.putText(
-            frame.image,
+            image,
             "O: " + frame.timestamp.strftime("%H:%M:%S"),
             (10, 70),
             cv2.FONT_HERSHEY_SIMPLEX,
@@ -122,7 +146,7 @@ class Stream:
             cv2.LINE_AA,
         )
         cv2.putText(
-            frame.image,
+            image,
             "C: " + frame.capture_time.strftime("%H:%M:%S,%f"),
             (10, 100),
             cv2.FONT_HERSHEY_SIMPLEX,

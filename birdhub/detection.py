@@ -13,7 +13,7 @@ from birdhub.yolo_utils import DetectMultiBackend
 from birdhub.yolo_utils import non_max_suppression
 from birdhub.yolo_utils import select_device
 from birdhub.orchestration import Mediator
-from birdhub.video import Frame
+from birdhub.video import Frame, ImageStore
 from birdhub.logging import logger
 
 
@@ -57,6 +57,7 @@ class Detector(ABC):
 
     def __init__(self) -> None:
         self._event_manager_connection = None
+        self._image_store = None
 
     def add_event_manager(self, event_manager: Mediator):
         # create commuinication pipe
@@ -68,18 +69,19 @@ class Detector(ABC):
     def detect(self, frame: Frame) -> Optional[List[Detection]]:
         raise NotImplementedError
 
-    def run(self):
+    def run(self, image_store: ImageStore):
         """Start the detector process"""
-        self._process = Thread(target=self._run)
+        self._process = Thread(target=self._run, args=(image_store,))
         self._process.start()
 
     def instantiate_model(self):
         """Instantiate the model"""
         pass
 
-    def _run(self):
+    def _run(self, image_store: ImageStore):
         # instantiate detection model
         self.instantiate_model()
+        self._image_store = image_store
         while True:
             frame = self._event_manager_connection.recv()
             self.detect(frame)
@@ -101,7 +103,7 @@ class SimpleMotionDetector(Detector):
         self._blur = blur
         self._dilation_kernel = dilation_kernel
         self._threshold_area = threshold_area
-        self._previous_frame = None
+        self._previous_image = None
         self._activation_frames = activation_frames
         self._motion_frames = 0
         self._detections = []
@@ -138,14 +140,18 @@ class SimpleMotionDetector(Detector):
 
     def detect(self, frame: Frame) -> Optional[List[Detection]]:
         """Detect motion between the current frame and the previous frame"""
+        # check if frame is available from store
+        image = self._image_store.get(frame.timestamp)
+        if image is None:
+            return None
         # add first frame
-        if self._previous_frame is None:
-            self._previous_frame = frame
+        if self._previous_image is None:
+            self._previous_image = image
             return None
         # Convert the frames to grayscale
         prep_frame, prep_previous = self._preprocess_image(
-            frame.image
-        ), self._preprocess_image(self._previous_frame.image)
+            image
+        ), self._preprocess_image(self._previous_image)
         if prep_frame is None or prep_previous is None:
             return None
         # Calculate the absolute difference between the current frame and the previous frame
@@ -182,8 +188,8 @@ class SimpleMotionDetector(Detector):
         if len(rects) == 0 and self._motion_frames > 0:
             self._motion_frames = 0
             self._detections = []
-        # Update the previous frame
-        self._previous_frame = frame
+        # Update the previous image
+        self._previous_image = image
         return None
 
 
