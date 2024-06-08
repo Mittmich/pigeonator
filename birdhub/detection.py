@@ -2,7 +2,7 @@
 import cv2
 from abc import ABC, abstractmethod
 from typing import List, Optional, Dict, Tuple
-from datetime import datetime
+from datetime import datetime, timedelta
 import numpy as np
 import torch
 import logging
@@ -55,9 +55,10 @@ class Detection:
 class Detector(ABC):
     """Base class for detectors"""
 
-    def __init__(self) -> None:
+    def __init__(self, max_delay:int = 5) -> None:
         self._event_manager_connection = None
         self._image_store = None
+        self._max_delay = max_delay
 
     def add_event_manager(self, event_manager: Mediator):
         # create commuinication pipe
@@ -84,6 +85,7 @@ class Detector(ABC):
         self._image_store = image_store
         while True:
             frame = self._event_manager_connection.recv()
+            #logger.log_event('received_frame',f'Received frame: {frame.timestamp}')
             self.detect(frame)
 
 
@@ -97,8 +99,9 @@ class SimpleMotionDetector(Detector):
         dilation_kernel=np.ones((5, 5)),
         threshold_area=50,
         activation_frames: int = 5,
+        max_delay:int = 5
     ):
-        super().__init__()
+        super().__init__(max_delay)
         self._threshold = threshold
         self._blur = blur
         self._dilation_kernel = dilation_kernel
@@ -140,6 +143,8 @@ class SimpleMotionDetector(Detector):
 
     def detect(self, frame: Frame) -> Optional[List[Detection]]:
         """Detect motion between the current frame and the previous frame"""
+        if datetime.now() - frame.timestamp > timedelta(seconds=self._max_delay):
+            return
         # check if frame is available from store
         image = self._image_store.get(frame.timestamp)
         if image is None:

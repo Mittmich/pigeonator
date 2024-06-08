@@ -58,7 +58,6 @@ class PersistedImageBuffer:
         self._images = LRUCache(maxsize=self._max_size_memory*2)
         self._disk_index_map = {}
         self._temp_file_count = 0
-        self._lock = Lock()
         self._ttl = ttl
     
     def _write_to_disk(self):
@@ -99,21 +98,19 @@ class PersistedImageBuffer:
         return output_array[i, :]
 
     def put(self, timestamp: datetime.datetime, image: np.ndarray) -> None:
-        with self._lock:
-            # check if cache is full
-            if len(self._images) >= self._max_size_memory:
-                # if full, write to disk
-                self._write_to_disk()
-            self._images[timestamp] = image
+        # check if cache is full
+        if len(self._images) >= self._max_size_memory:
+            # if full, write to disk
+            self._write_to_disk()
+        self._images[timestamp] = image
 
     def get(self, timestamp: datetime.datetime) -> Optional[np.ndarray]:
-        with self._lock:
-            # check if image is in memory
-            if timestamp in self._images:
-                return self._images[timestamp]
-            else:
-                # check if image is on disk
-                return self._read_from_disk(timestamp)
+        # check if image is in memory
+        if timestamp in self._images:
+            return self._images[timestamp]
+        else:
+            # check if image is on disk
+            return self._read_from_disk(timestamp)
 
 
 
