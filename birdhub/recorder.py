@@ -58,11 +58,9 @@ class Recorder(ABC):
     def register_frame(self, frame: Frame):
         pass
     
-    @abstractmethod
     def register_detection(self, detection: List[Detection]):
         pass
 
-    @abstractmethod
     def register_effect_activation(self, data: dict):
         pass
 

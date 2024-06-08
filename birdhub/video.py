@@ -260,6 +260,8 @@ class RaspberryPiStream:
             config = self.cap.create_video_configuration({'format': 'BGR888'})
         elif quality == 'high':
             config = self.cap.create_still_configuration({'format': 'BGR888'})
+        # activate configuration
+        self.cap.configure(config)
         self._frameSize = config['main']['size']
 
 
