@@ -108,8 +108,6 @@ class EventRecorder(Recorder):
         self._detection_writer = None
         self._stop_recording_in = 0
         self._detection_writer_factory = detection_writer_factory
-        # instantiate detection image buffer that is persisted to disk
-        self._detection_image_buffer = PersistedImageBuffer(max_size_memory=slack)
         self._detection_frame_buffer = []
         self._detections = []
         self._recording = False
@@ -123,7 +121,7 @@ class EventRecorder(Recorder):
         self, detections: List[Detection], frame: Frame
     ) -> Frame:
         # retrieve image from buffer
-        image = self._detection_image_buffer.get(frame.timestamp)
+        image = self._image_store.get(frame.timestamp)
         if image is None:
             return frame
         candidate_detection = [
@@ -139,7 +137,7 @@ class EventRecorder(Recorder):
                 cv2.rectangle(image, (x1, y1), (x2, y2), (255, 0, 0), 5)
                 cv2.putText(image, label, (x1, y2 + 15), cv2.FONT_HERSHEY_SIMPLEX, 1, 255)
             # put image back to buffer
-            self._detection_image_buffer.put(frame.timestamp, image)
+            self._image_store.put(frame.timestamp, image)
         return frame
 
     def create_detection_frames(self, detections: List[Detection]) -> List[np.ndarray]:
@@ -202,7 +200,7 @@ class EventRecorder(Recorder):
             )
         for detection_frame in self._detections:
             # retrive image from buffer
-            image = self._detection_image_buffer.get(detection_frame.timestamp)
+            image = self._image_store.get(detection_frame.timestamp)
             if image is not None:
                 self._detection_writer.write(image)
         self._detections = []
@@ -213,7 +211,7 @@ class EventRecorder(Recorder):
     ):
         if frame.timestamp in write_timestamps:
             # get image from buffer
-            image = self._detection_image_buffer.get(frame.timestamp)
+            image = self._image_store.get(frame.timestamp)
             if image is not None:
                 # get boundary of this text
                 textsize = cv2.getTextSize(data["type"], cv2.FONT_HERSHEY_DUPLEX, 7, 2)[0]
@@ -230,7 +228,7 @@ class EventRecorder(Recorder):
                     2,
                 )
                 # write image back to buffer
-                self._detection_image_buffer.put(frame.timestamp, image)
+                self._image_store.put(frame.timestamp, image)
 
     def register_effect_activation(self, data: dict):
         self._activations.append(data)
@@ -241,7 +239,7 @@ class EventRecorder(Recorder):
         if image is None:
             return
         # add frame to persisted cache
-        self._detection_image_buffer.put(frame.timestamp, image)
+        self._image_store.put(frame.timestamp, image)
         self._update_lookback_frames(frame)
         # decide whether to write detection frames
         if len(self._detections) > self._detection_slack:
@@ -281,7 +279,7 @@ class EventRecorder(Recorder):
             # write look back frames
             for frame in self._look_back_frames:
                 # get image from buffer
-                image = self._detection_image_buffer.get(frame.timestamp)
+                image = self._image_store.get(frame.timestamp)
                 if image is not None:
                     self._writer.write(image)
             # write detection data to a file
