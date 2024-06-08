@@ -9,3 +9,4 @@ birdhub.egg-info/*
 .vscode
 logs/*
 build/*
+env/*

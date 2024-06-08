@@ -6,7 +6,7 @@ from birdhub.detection import (
     BirdDetectorYolov5,
     MotionActivatedSingleClassDetector,
 )
-from birdhub.video import Stream
+from birdhub.video import RTSPStream
 from birdhub.logging import logger
 from birdhub.effectors import EFFECTORS
 from datetime import timedelta
@@ -34,7 +34,7 @@ def record():
 @click.option("--fps", type=int, default=10)
 def continuous(url, outputdir, fps):
     """Record from video stream and save to file"""
-    stream = Stream(url)
+    stream = RTSPStream(url)
     recorder = ContinuousRecorder(
         outputDir=outputdir, frame_size=stream.frameSize, fps=fps
     )
@@ -50,7 +50,7 @@ def continuous(url, outputdir, fps):
 def motion(url, outputdir, fps, slack):
     """Record from video stream and save to file"""
     # TODO: make threshold dependent on image size
-    stream = Stream(url)
+    stream = RTSPStream(url)
     recorder = EventRecorder(
         outputDir=outputdir, frame_size=stream.frameSize, fps=fps, slack=slack
     )
@@ -66,7 +66,7 @@ def motion(url, outputdir, fps, slack):
 @click.option("--slack", type=int, default=100)
 @click.option("--model", type=str, default="weights/bh_v1.onnx")
 def birds(url, outputdir, fps, slack, model):
-    stream = Stream(url)
+    stream = RTSPStream(url)
     recorder = EventRecorder(
         outputDir=outputdir, frame_size=stream.frameSize, fps=fps, slack=slack
     )
@@ -109,7 +109,7 @@ def deter(
     sound_path,
     ocr_weights,
 ):
-    stream = Stream(url, ocr_weights=ocr_weights)
+    stream = RTSPStream(url, ocr_weights=ocr_weights)
     if record:
         recorder = EventRecorder(
             outputDir=outputdir,

@@ -74,7 +74,7 @@ class VideoEventManager(Mediator):
             if self._recorder is not None:
                 self._pipes["recorder"].send(data)
         # sleep to avoid busy wating
-        await asyncio.sleep(0.2)
+        #await asyncio.sleep(0.2)
 
     def register_pipe(self, name: str, pipe: Pipe):
         """Registers pipe with event manager."""
