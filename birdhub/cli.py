@@ -1,12 +1,13 @@
 import click
 from birdhub.recorder import ContinuousRecorder, EventRecorder
+import asyncio
 from birdhub.orchestration import VideoEventManager
 from birdhub.detection import (
     SimpleMotionDetector,
     BirdDetectorYolov5,
     MotionActivatedSingleClassDetector,
 )
-from birdhub.video import RTSPStream
+from birdhub.video import RTSPStream, RaspberryPiStream
 from birdhub.logging import logger
 from birdhub.effectors import EFFECTORS
 from datetime import timedelta
@@ -95,7 +96,8 @@ def birds(url, outputdir, fps, slack, model):
 @click.option("--record", type=bool, default=True)
 @click.option("--sound_path", type=str, default="sounds/crow_1.mp3")
 @click.option("--minimum_number_detections", type=int, default=5)
-@click.option("--ocr_weights", type=str, default="weights/ocr_v4.pt")
+@click.option("--stream_type", type=str, default="rtsp")
+@click.option("--motion_th_area", type=int, default=2_000)
 def deter(
     url,
     outputdir,
@@ -107,9 +109,13 @@ def deter(
     record,
     minimum_number_detections,
     sound_path,
-    ocr_weights,
+    stream_type,
+    motion_th_area
 ):
-    stream = RTSPStream(url, ocr_weights=ocr_weights)
+    if stream_type == 'rtsp':
+        stream = RTSPStream(url)
+    elif stream_type == 'raspi':
+        stream = RaspberryPiStream(fps=fps)
     if record:
         recorder = EventRecorder(
             outputDir=outputdir,
@@ -120,8 +126,8 @@ def deter(
         )
     else:
         recorder = None
-    motion_detector = SimpleMotionDetector(threshold_area=5_000)
-    bird_detector = BirdDetectorYolov5(model, confidence_threshold=0.6)
+    motion_detector = SimpleMotionDetector(threshold_area=motion_th_area, activation_frames=1, max_delay=2)
+    bird_detector = BirdDetectorYolov5(model, confidence_threshold=0.6, max_delay=2)
     motion_activated_detector = MotionActivatedSingleClassDetector(
         bird_detector,
         motion_detector,
@@ -138,10 +144,9 @@ def deter(
         stream=stream,
         recorder=recorder,
         detector=motion_activated_detector,
-        throttle_detection=1,
         effector=effector,
     )
-    event_manager.run()
+    asyncio.run(event_manager.run())
 
 
 record.add_command(motion)
