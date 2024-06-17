@@ -58,7 +58,6 @@ class PersistedImageBuffer:
         self._images = LRUCache(maxsize=self._max_size_memory*2)
         self._disk_index_map = {}
         self._temp_file_count = 0
-        self._lock = Lock()
         self._ttl = ttl
     
     def _write_to_disk(self):
@@ -99,37 +98,31 @@ class PersistedImageBuffer:
         return output_array[i, :]
 
     def put(self, timestamp: datetime.datetime, image: np.ndarray) -> None:
-        with self._lock:
-            # check if cache is full
-            if len(self._images) >= self._max_size_memory:
-                # if full, write to disk
-                self._write_to_disk()
-            self._images[timestamp] = image
+        # check if cache is full
+        if len(self._images) >= self._max_size_memory:
+            # if full, write to disk
+            self._write_to_disk()
+        self._images[timestamp] = image
 
     def get(self, timestamp: datetime.datetime) -> Optional[np.ndarray]:
-        with self._lock:
-            # check if image is in memory
-            if timestamp in self._images:
-                return self._images[timestamp]
-            else:
-                # check if image is on disk
-                return self._read_from_disk(timestamp)
+        # check if image is in memory
+        if timestamp in self._images:
+            return self._images[timestamp]
+        else:
+            # check if image is on disk
+            return self._read_from_disk(timestamp)
 
 
 
-class Stream:
+class RTSPStream:
     def __init__(
-        self, streamurl, ocr_weights="../weights/ocr_v3.pt", write_timestamps=True
+        self, streamurl, write_timestamps=True
     ):
         self.streamurl = streamurl
         self.cap = None
         self._event_manager = None
         self._previous_timestamp = None
         self._frame_index = 0
-        self._digit_model = DigitModel()
-        self._digit_model.load_state_dict(
-            torch.load(ocr_weights, map_location=torch.device("cpu"))
-        )
         self._write_timestamps = write_timestamps
         self._process = None
         # start and stop stream to get frame size
@@ -241,6 +234,137 @@ class Stream:
 
     def __del__(self):
         self.cap.release()
+        cv2.destroyAllWindows()
+
+
+
+class RaspberryPiStream:
+    """Raspberry pi camera stream"""
+    def __init__(
+        self, write_timestamps=True, quality='medium', fps=10
+    ):
+        # import picamera here
+        import picamera2
+        self._event_manager = None
+        self._previous_timestamp = None
+        self._frame_index = 0
+        self._write_timestamps = write_timestamps
+        self._process = None
+        self._fps = fps
+        # initialize camera
+        self.cap = picamera2.Picamera2()
+        # initialize configuration
+        if quality == 'low':
+            config = self.cap.create_preview_configuration({'format': 'BGR888'})
+        elif quality == 'medium':
+            config = self.cap.create_video_configuration({'format': 'BGR888'})
+        elif quality == 'high':
+            config = self.cap.create_still_configuration({'format': 'BGR888'})
+        # activate configuration
+        self.cap.configure(config)
+        self._frameSize = config['main']['size']
+
+
+    def get_frame(self, image_store: ImageStore):
+        image = self.cap.capture_array('main')
+        timestamp = self._get_timestamp(image)
+        # if self._frame_index % 10 == 0:
+        #     timestamp = self._get_timestamp(frame)
+        #     if timestamp is None:
+        #         timestamp = self._previous_timestamp
+        #     self._previous_timestamp = timestamp
+        #     self._frame_index = 0
+        # else:
+        #     # add index to microsecond part of timestamp to make it unique
+        #     timestamp = self._previous_timestamp + datetime.timedelta(
+        #         microseconds=self._frame_index
+        #     )
+        # self._frame_index += 1
+        # create frame messag object
+        frame = Frame(timestamp, datetime.datetime.now())
+        if self._write_timestamps:
+            self._write_timestamp(frame, image)
+        # image to store
+        image_store.put(timestamp, image)
+        return frame
+
+    def _get_timestamp(self, frame):
+        try:
+            timestamp = datetime.datetime.now()
+        except ValueError as e:
+            self._event_manager.log("timestamp_error", None, level=logging.INFO)
+            logger.warning("Could not extract timestamp from frame: {}".format(e))
+            # write frame to file for debugging
+            now = datetime.datetime.now()
+            cv2.imwrite(
+                f"train_model/raw_data/timestamp_errors/timestamp_error_{now.strftime('%H:%M:%S')}.jpg",
+                frame,
+            )
+            timestamp = None
+        return timestamp
+
+    def run(self, event_queue: Queue, image_store: ImageStore):
+        """Start the stream and add new frames to the queue."""
+        self._process = Thread(target=self._async_wrapper, args=(event_queue,image_store,))
+        self._process.start()
+
+    def _async_wrapper(self, event_queue: Queue, image_store: ImageStore):
+        """Start the stream and add new frames to the queue."""
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(self._run(event_queue, image_store))
+        loop.close()
+
+    async def _run(self, event_queue: Queue, image_store: ImageStore):
+        """Start the stream and add new frames to the queue."""
+        # initialize stream
+        self.cap.start()
+        logger.log_event("stream_started", None, level=logging.INFO)
+        while True:
+            await event_queue.put(("video_frame", self.get_frame(image_store)))
+            await asyncio.sleep(1/self._fps)
+
+    def _write_timestamp(self, frame, image):
+        cv2.putText(
+            image,
+            "O: " + frame.timestamp.strftime("%H:%M:%S"),
+            (10, 70),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            1,
+            (255, 255, 255),
+            2,
+            cv2.LINE_AA,
+        )
+        cv2.putText(
+            image,
+            "C: " + frame.capture_time.strftime("%H:%M:%S,%f"),
+            (10, 100),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            1,
+            (255, 255, 255),
+            2,
+            cv2.LINE_AA,
+        )
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.cap.stop()
+        cv2.destroyAllWindows()
+
+    def __next__(self):
+        return self.get_frame()
+
+    @property
+    def frameSize(self):
+        return self._frameSize
+
+    def __iter__(self):
+        return self
+
+    def __del__(self):
+        self.cap.stop()
         cv2.destroyAllWindows()
 
 

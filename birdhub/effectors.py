@@ -3,6 +3,7 @@
 from abc import ABC, abstractmethod
 from typing import Optional, List, Dict
 from multiprocessing import Process, Pipe
+import pygame
 from threading import Thread
 from datetime import timedelta, datetime
 from playsound import playsound
@@ -97,6 +98,11 @@ class MockEffector(Effector):
 class SoundEffector(Effector):
     """Plays specified sound"""
 
+    def __init__(self,*args, **kwargs):
+        super().__init__(*args, **kwargs)
+        pygame.init()
+        self._sound = pygame.mixer.Sound(self._config["sound_file"])
+
     def register_detection(self, data: Optional[List[Detection]]) -> None:
         """Register detection"""
         if data is None or len(data) == 0:
@@ -108,7 +114,7 @@ class SoundEffector(Effector):
                 and self.is_activation_allowed()
             ):
                 activation_time = datetime.now()
-                playsound(self._config["sound_file"])
+                self._sound.play()
                 end_time = datetime.now()
                 detection_time = detection.get("frame_timestamp", None)
                 if detection_time is not None and isinstance(detection_time, datetime):

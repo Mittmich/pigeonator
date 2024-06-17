@@ -12,3 +12,4 @@ build/*
 *.jpg
 train_model/dataset_v8/*
 train_model/wandb/*
+env/*

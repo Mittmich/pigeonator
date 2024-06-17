@@ -6,6 +6,7 @@ import asyncio
 from asyncio import Queue
 from multiprocessing import Pipe
 from datetime import timedelta, datetime
+import logging
 from birdhub.logging import logger
 from birdhub.video import ImageStore
 
@@ -58,6 +59,7 @@ class VideoEventManager(Mediator):
             if datetime.now() - data.timestamp > timedelta(seconds=self._max_delay):
                 return
             if self._detector is not None:
+                #logger.log_event('sent_frame',f'Sent frame {data.timestamp}')
                 self._pipes["detector"].send(data)
             if self._recorder is not None:
                 self._pipes["recorder"].send(data)
@@ -71,6 +73,8 @@ class VideoEventManager(Mediator):
             logger.log_event("effect_activated", data.get("meta_information", None))
             if self._recorder is not None:
                 self._pipes["recorder"].send(data)
+        # sleep to avoid busy wating
+        #await asyncio.sleep(0.2)
 
     def register_pipe(self, name: str, pipe: Pipe):
         """Registers pipe with event manager."""

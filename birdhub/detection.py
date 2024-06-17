@@ -2,7 +2,7 @@
 import cv2
 from abc import ABC, abstractmethod
 from typing import List, Optional, Dict, Tuple
-from datetime import datetime
+from datetime import datetime, timedelta
 import numpy as np
 import torch
 import logging
@@ -55,8 +55,10 @@ class Detection:
 class Detector(ABC):
     """Base class for detectors"""
 
-    def __init__(self) -> None:
+    def __init__(self, max_delay:int = 5) -> None:
         self._event_manager_connection = None
+        self._image_store = None
+        self._max_delay = max_delay
         self._image_store = None
 
     def add_event_manager(self, event_manager: Mediator):
@@ -68,6 +70,9 @@ class Detector(ABC):
     @abstractmethod
     def detect(self, frame: Frame) -> Optional[List[Detection]]:
         raise NotImplementedError
+
+    def add_image_store(self, image_store: ImageStore):
+        self._image_store = image_store
 
     def run(self, image_store: ImageStore):
         """Start the detector process"""
@@ -81,9 +86,10 @@ class Detector(ABC):
     def _run(self, image_store: ImageStore):
         # instantiate detection model
         self.instantiate_model()
-        self._image_store = image_store
+        self.add_image_store(image_store)
         while True:
             frame = self._event_manager_connection.recv()
+            #logger.log_event('received_frame',f'Received frame: {frame.timestamp}')
             self.detect(frame)
 
 
@@ -97,8 +103,9 @@ class SimpleMotionDetector(Detector):
         dilation_kernel=np.ones((5, 5)),
         threshold_area=50,
         activation_frames: int = 5,
+        max_delay:int = 5
     ):
-        super().__init__()
+        super().__init__(max_delay)
         self._threshold = threshold
         self._blur = blur
         self._dilation_kernel = dilation_kernel
@@ -140,6 +147,8 @@ class SimpleMotionDetector(Detector):
 
     def detect(self, frame: Frame) -> Optional[List[Detection]]:
         """Detect motion between the current frame and the previous frame"""
+        if datetime.now() - frame.timestamp > timedelta(seconds=self._max_delay):
+            return
         # check if frame is available from store
         image = self._image_store.get(frame.timestamp)
         if image is None:
@@ -258,14 +267,14 @@ class BirdDetectorYolov5(Detector):
     def detect(self, frame: Frame) -> Optional[List[Detection]]:
         if self._model is None:
             raise ValueError("Model not instantiated")
-        if frame.image is None:
+        image = self._image_store.get(frame.timestamp)
+        if image is None:
             return None
         # check for delay and drop frame if delay is too high
-        current_time = datetime.now()
-        if (current_time - frame.timestamp).seconds > self._max_delay:
-            return None
-        original_size = frame.image.shape[1], frame.image.shape[0]
-        resized = cv2.resize(frame.image, (self._image_size))
+        if datetime.now() - frame.timestamp > timedelta(seconds=self._max_delay):
+            return
+        original_size = image.shape[1], image.shape[0]
+        resized = cv2.resize(image, (self._image_size))
         # assumes im is in opencv BGR format
         im = resized.transpose(2, 0, 1)[::-1]  # BGR to RGB
         im = np.ascontiguousarray(im)
@@ -394,6 +403,9 @@ class SingleClassSequenceDetector(Detector):
         """Delegate model instantiation to the detector."""
         self._detector.instantiate_model()
 
+    def add_image_store(self, image_store: ImageStore):
+        self._detector.add_image_store(image_store)
+
 
 class MotionActivatedSingleClassDetector(SingleClassSequenceDetector):
     """Detector that is a composition of a motion detector and another detctor.
@@ -447,3 +459,7 @@ class MotionActivatedSingleClassDetector(SingleClassSequenceDetector):
         """Delegate model instantiation to the two detector."""
         self._detector.instantiate_model()
         self._motion_detector.instantiate_model()
+
+    def add_image_store(self, image_store: ImageStore):
+        self._detector.add_image_store(image_store)
+        self._motion_detector.add_image_store(image_store)
