@@ -4,13 +4,16 @@ import datetime
 import numpy as np
 import cv2
 from birdhub.detection import BirdDetectorYolov5, Frame
+from birdhub.video import ImageStore
 
 
 class TestBirdDetectorYolov5:
     @pytest.fixture(autouse=True)
     def setup(self):
+        self._image_store = ImageStore(number_images=10)
         self.bird_detector = BirdDetectorYolov5("weights/bh_v1.onnx")
         self.bird_detector.instantiate_model()
+        self.bird_detector._image_store = self._image_store
 
     def test_extract_birds_from_prediction(self):
         prediction = torch.tensor([[0, 0, 0, 0, 0.5, 1]])
@@ -33,7 +36,9 @@ class TestBirdDetectorYolov5:
     def test_detect_bird(self):
         # load test jpg image
         image = cv2.resize(cv2.imread("tests/test_data/pigeon.jpg"), (640, 640))
-        frame = Frame(image=image, timestamp=datetime.datetime.now())
+        ts = datetime.datetime.now()
+        self._image_store.put(ts, image)
+        frame = Frame(timestamp=ts)
         detections = self.bird_detector.detect(frame)
         assert detections[0].labels == ["Pigeon"]
         assert len(detections) == 1

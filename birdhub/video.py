@@ -255,11 +255,11 @@ class RaspberryPiStream:
         self.cap = picamera2.Picamera2()
         # initialize configuration
         if quality == 'low':
-            config = self.cap.create_preview_configuration({'format': 'BGR888'})
+            config = self.cap.create_preview_configuration({'format': 'RGB888'})
         elif quality == 'medium':
-            config = self.cap.create_video_configuration({'format': 'BGR888'})
+            config = self.cap.create_video_configuration({'format': 'RGB888'})
         elif quality == 'high':
-            config = self.cap.create_still_configuration({'format': 'BGR888'})
+            config = self.cap.create_still_configuration({'format': 'RGB888'})
         # activate configuration
         self.cap.configure(config)
         self._frameSize = config['main']['size']

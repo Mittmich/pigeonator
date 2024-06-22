@@ -91,7 +91,7 @@ def birds(url, outputdir, fps, slack, model):
 @click.option("--target_class", type=str, default="Pigeon")
 @click.option("--fps", type=int, default=10)
 @click.option("--slack", type=int, default=100)
-@click.option("--model", type=str, default="weights/bh_v1.onnx")
+@click.option("--model", type=str, default="weights/bh_v2.onnx")
 @click.option("--effector", type=str, default="mock")
 @click.option("--record", type=bool, default=True)
 @click.option("--sound_path", type=str, default="sounds/crow_1.mp3")
