@@ -4,22 +4,36 @@ from unittest.mock import patch, MagicMock
 import datetime
 from birdhub.recorder import ContinuousRecorder, EventRecorder
 from birdhub.detection import Detection, Frame
+from birdhub.video import ImageStore
 
 
 @pytest.fixture
-def empty_frame():
+def empty_image():
+    return np.zeros((640, 640, 3), dtype=np.uint8)
+
+@pytest.fixture
+def random_image():
+    np.random.seed(42)
+    return np.random.randint(0, 255, (640, 640, 3), dtype=np.uint8)
+
+@pytest.fixture
+def image_store(empty_image, random_image):
+    image_store = ImageStore(number_images=100)
+    image_store.put(datetime.datetime(year=2023, month=5, day=8), empty_image)
+    image_store.put(datetime.datetime(year=2023, month=5, day=8), random_image)
+    return image_store
+
+@pytest.fixture
+def empty_frame(empty_image):
     return Frame(
         timestamp=datetime.datetime(year=2023, month=5, day=8),
-        image=np.zeros((640, 640, 3), dtype=np.uint8),
     )
 
 
 @pytest.fixture
 def random_frame():
-    np.random.seed(42)
     return Frame(
         timestamp=datetime.datetime(year=2023, month=5, day=8),
-        image=np.random.randint(0, 255, (640, 640, 3), dtype=np.uint8),
     )
 
 
@@ -57,7 +71,7 @@ def mock_event_manager():
 
 
 @pytest.fixture
-def event_recorder(mock_writer, mock_detection_writer, mock_event_manager):
+def event_recorder(mock_writer, mock_detection_writer, mock_event_manager, image_store):
     er = EventRecorder(
         "output_dir",
         frame_size=(640, 480),
@@ -66,6 +80,7 @@ def event_recorder(mock_writer, mock_detection_writer, mock_event_manager):
         detection_writer_factory=mock_detection_writer[0],
     )
     er.add_event_manager(mock_event_manager)
+    er._image_store = image_store
     return er
 
 
@@ -115,12 +130,13 @@ def multiple_motion_events_stream(empty_frame, random_frame):
     return stream
 
 
-def test_ContinuousRecorder_records(empty_frame, mock_writer):
+def test_ContinuousRecorder_records(empty_frame, mock_writer, image_store):
     cr = ContinuousRecorder(
         "output_dir", frame_size=(640, 480), fps=10, writer_factory=mock_writer[0]
     )
+    cr._image_store = image_store
     cr.register_frame(empty_frame)
-    mock_writer[1].write.assert_called_with(empty_frame.image)
+    mock_writer[1].write.assert_called_with(image_store.get(empty_frame.timestamp))
 
 
 def test_Event_Recorder_does_not_record_without_detection(
@@ -132,16 +148,16 @@ def test_Event_Recorder_does_not_record_without_detection(
 
 
 def test_Event_Recorder_records_after_detection(
-    empty_frame, example_detections, mock_writer, event_recorder
+    empty_frame, example_detections, mock_writer, event_recorder, image_store
 ):
     event_recorder.register_detection(example_detections)
     event_recorder.register_frame(empty_frame)
     assert mock_writer[1].write.call_count == 1
-    mock_writer[1].write.assert_any_call(empty_frame.image)
+    mock_writer[1].write.assert_any_call(image_store.get(empty_frame.timestamp))
 
 
 def test_Event_Recorder_records_look_back_frames_correctly(
-    empty_frame, random_frame, example_detections, mock_writer, event_recorder
+    empty_frame, random_frame, example_detections, mock_writer, event_recorder, image_store
 ):
     frames = [empty_frame] + [random_frame]
     # register first 5 frames
@@ -152,7 +168,7 @@ def test_Event_Recorder_records_look_back_frames_correctly(
     assert mock_writer[1].write.call_count == 2
     # check that the first 5 frames are written
     for actual, expected in zip(mock_writer[1].write.mock_calls, frames):
-        np.testing.assert_array_equal(actual.args[0], expected.image)
+        np.testing.assert_array_equal(actual.args[0], image_store.get(expected.timestamp))
 
 
 # Write tests for detection writing

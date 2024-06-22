@@ -36,7 +36,7 @@ def dummy_frame():
 def diff_frame():
     # Create a 100x100 white image and a timestamp
     image = np.ones((100, 100, 3), dtype=np.uint8) * 255
-    timestamp = datetime.datetime.now()
+    timestamp = datetime.datetime.now() + datetime.timedelta(seconds=10)
     return Frame(timestamp), image
 
 
