@@ -14,8 +14,8 @@ def big_detection(empty_array):
     return [
         Detection(
             empty_array,
-            ["cat", "dog", "bird", "elephant", "tiger"],
-            [0.1, 0.2, 0.3, 0.4, 0.5],
+            ["cat", "dog", "bird", "elephant", "tiger", 'tiger'],
+            [0.1, 0.2, 0.3, 0.4, 0.5, 0.6],
         )
     ]
 
@@ -71,6 +71,7 @@ def test_single_class_sequence_has_reached_consensus(
         seq.add_event_manager(mock_event_manager)
         result = seq.detect(empty_array)
         assert result[0].get("meta_information")["most_likely_object"] == "tiger"
+        assert np.isclose(result[0].get("meta_information")["mean_confidence"], 0.55)
         connection.send.assert_called()
 
 
