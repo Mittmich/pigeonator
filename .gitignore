@@ -13,3 +13,4 @@ build/*
 train_model/dataset_v8/*
 train_model/wandb/*
 env/*
+train_model/dataset_v9/*
