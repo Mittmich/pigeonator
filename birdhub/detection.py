@@ -216,7 +216,8 @@ class BirdDetectorYolov5(Detector):
         image_size: Tuple[int] = (640, 640),
         confidence_threshold: float = 0.25,
         iou_threhsold: float = 0.45,
-        max_delay: int = 10 # in seconds
+        max_delay: int = 10, # in seconds
+        threshold_area: int = 50,
     ) -> None:
         super().__init__()
         self._model_path = model_path
@@ -228,6 +229,7 @@ class BirdDetectorYolov5(Detector):
         self._confidence_threshold = confidence_threshold
         self._iou_threhsold = iou_threhsold
         self._max_delay = max_delay
+        self._threshold_area = threshold_area
 
     def _load_model(self, model_path):
         model = DetectMultiBackend(model_path, device=self._device)
@@ -298,6 +300,12 @@ class BirdDetectorYolov5(Detector):
         birds = self._extract_birds_from_prediction(stacked)
         confidences = self._get_confidences(stacked)
         boxes = self._get_boxes(stacked, original_size)
+        sizes = [(box[2] - box[0]) * (box[3] - box[1]) for box in boxes]
+        # filter out small detections
+        birds = [bird for bird, size in zip(birds, sizes) if size > self._threshold_area]
+        confidences = [conf for conf, size in zip(confidences, sizes) if size > self._threshold_area]
+        boxes = [box for box, size in zip(boxes, sizes) if size > self._threshold_area]
+        sizes = [size for size in sizes if size > self._threshold_area]
         if len(birds) > 0:
             detection = [
                 Detection(
