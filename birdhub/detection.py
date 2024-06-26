@@ -27,15 +27,21 @@ class Detection:
         confidences: Optional[List[float]] = None,
         bboxes: Optional[List[np.ndarray]] = None,
         meta_information: Dict[str, str] = None,
+        detection_areas: Optional[int] = None,
     ):
         self.frame_timestamp = frame_timestamp
         self.labels = labels
         self.confidences = confidences
         self.bboxes = bboxes
         self.meta_information = meta_information
+        self.detection_areas = detection_areas
 
     def __str__(self):
-        return f"Detection(timestamp={self.frame_timestamp}, labels={self.labels}, confidences={self.confidences}, meta_information={self.meta_information})"
+        return f"""Detection(timestamp={self.frame_timestamp},
+                    labels={self.labels},
+                    confidences={self.confidences},
+                    meta_information={self.meta_information}),
+                    detection_areas={self.detection_areas})"""
 
     def set(self, key, value):
         setattr(self, key, value)
@@ -135,6 +141,7 @@ class SimpleMotionDetector(Detector):
                 frame.timestamp,
                 labels=["motion"] * len(rects),
                 confidences=[1.0] * len(rects),
+                detection_areas=[(box[2] - box[0]) * (box[3] - box[1]) for box in rects],
                 bboxes=rects,
                 meta_information={
                     "type": "motion",
@@ -297,6 +304,7 @@ class BirdDetectorYolov5(Detector):
                     frame_timestamp=frame.timestamp,
                     labels=birds,
                     confidences=confidences,
+                    detection_areas=[(box[2] - box[0]) * (box[3] - box[1]) for box in boxes],
                     bboxes=boxes,
                     meta_information={
                         "type": "bird detected",
@@ -357,9 +365,12 @@ class SingleClassSequenceDetector(Detector):
             for obj, conf in zip(objects, confidences):
                 self._number_detections += 1
                 if obj not in self._object_detections:
-                    self._object_detections[obj] = conf
+                    self._object_detections[obj] = {'confidence': conf, 'count': 1}
                 else:
-                    self._object_detections[obj] = self._object_detections[obj] + conf
+                    self._object_detections[obj] = {
+                        'confidence':self._object_detections[obj]['confidence'] + conf,
+                        'count': self._object_detections[obj]['count'] + 1
+                    }
         self._detections.extend(detections)
 
     def _blank_detections(self):
@@ -374,7 +385,7 @@ class SingleClassSequenceDetector(Detector):
             meta = detection.get("meta_information", {})
             meta["most_likely_object"] = most_likely_object
             meta["mean_confidence"] = (
-                self._object_detections[most_likely_object] / self._number_detections
+                self._object_detections[most_likely_object]['confidence'] / self._object_detections[most_likely_object]['count']
             )
             detection.set("meta_information", meta)
 
@@ -397,7 +408,7 @@ class SingleClassSequenceDetector(Detector):
     def _get_most_likely_object(self):
         if self._number_detections < self._minimum_number_detections:
             return None
-        return max(self._object_detections, key=self._object_detections.get)
+        return max(self._object_detections, key=lambda x: self._object_detections[x]['confidence'])
     
     def instantiate_model(self):
         """Delegate model instantiation to the detector."""
