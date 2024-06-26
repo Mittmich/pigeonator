@@ -127,7 +127,7 @@ def deter(
     else:
         recorder = None
     motion_detector = SimpleMotionDetector(threshold_area=motion_th_area, activation_frames=1, max_delay=2)
-    bird_detector = BirdDetectorYolov5(model, confidence_threshold=0.6, max_delay=2)
+    bird_detector = BirdDetectorYolov5(model, confidence_threshold=0.6, max_delay=2, threshold_area=motion_th_area)
     motion_activated_detector = MotionActivatedSingleClassDetector(
         bird_detector,
         motion_detector,
