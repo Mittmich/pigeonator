@@ -66,7 +66,7 @@ def send_recording_stopped(server_address: str, data: dict):
         return requests.post(
             f"{server_address}/recordings/",
             files={
-                "file": (Path(data["recording_file"].name), f, "video/mp4"),
+                "file": (Path(data["recording_file"]).name, f, "video/mp4"),
             },
             data={
                 "recording_timestamp": data["recording_time"],
