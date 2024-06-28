@@ -36,9 +36,9 @@ def send_detection(server_address: str, data: list[Detection]):
         json={
             "detections": [
                 {
-                    "detected_class": data["meta_information"]["most_likely_object"],
-                    "detection_timestamp": data["frame_timestamp"],
-                    "confidence": data["mean_confidence"],
+                    "detected_class": data.get('meta_information')["most_likely_object"],
+                    "detection_timestamp": data.get("frame_timestamp"),
+                    "confidence": data.get("mean_confidence"),
                 }
             ],
         },
@@ -95,21 +95,6 @@ class EventDispatcher:
             listening_for = self.EVENT_HANDLERS.keys()
         self._listening_for = listening_for
 
-    @staticmethod
-    def send_detection(server_address: str, data: dict):
-        """Send detection data to the remote server."""
-        requests.post(server_address, json=data)
-
-    @staticmethod
-    def send_effect_activated(self, server_address: str, data: dict):
-        """Send effect activated data to the remote server."""
-        requests.post(server_address, json=data)
-
-    @staticmethod
-    def send_recording_stopped(self, server_address: str, data: dict):
-        """Send recording stopped data to the remote server."""
-        requests.post(server_address, json=data)
-
     def run(self):
         """Start the detector process"""
         self._process = Thread(target=self._run)
@@ -119,7 +104,7 @@ class EventDispatcher:
         """Run the effector"""
         while True:
             if self._event_manager_connection.poll():
-                self.register_event(self._event_manager_connection.recv())
+                self.register_event(*self._event_manager_connection.recv())
 
     def add_event_manager(self, event_manager: Mediator):
         # create commuinication pipe
