@@ -8,7 +8,7 @@ from typing import List, Tuple
 from multiprocessing import Pipe
 from threading import Thread
 import numpy as np
-from birdhub.video import VideoWriter, Frame, ImageStore, PersistedImageBuffer
+from birdhub.video import VideoWriter, Frame, ImageStore
 from birdhub.orchestration import Mediator
 from birdhub.detection import Detection
 from birdhub.logging import logger
@@ -33,7 +33,7 @@ class Recorder(ABC):
         return datetime.now().strftime("%Y%m%d_%H%M%S")
 
     def _get_recording_output_file(self):
-        return os.path.join(self._outputDir, f"{self._get_timestamp()}.avi")
+        return os.path.join(self._outputDir, f"{self._get_timestamp()}.mp4")
 
     def add_event_manager(self, event_manager: Mediator):
         # create commuinication pipe
@@ -76,7 +76,7 @@ class ContinuousRecorder(Recorder):
         super().__init__(outputDir, frame_size, fps, writer_factory)
         logger.log_event("recording_started", "Continuous recording started")
         self._writer = self._writer_factory(
-            self._get_recording_output_file(), self._fps, frame_size
+            self._get_recording_output_file() ,self._fps, frame_size
         )
 
     def register_frame(self, frame: Frame):
@@ -113,7 +113,7 @@ class EventRecorder(Recorder):
         self._activations = []
 
     def _get_detection_output_file(self):
-        return os.path.join(self._outputDir, f"{self._get_timestamp()}_detections.avi")
+        return os.path.join(self._outputDir, f"{self._get_timestamp()}_detections.mp4")
 
     def _create_detection_frame(
         self, detections: List[Detection], frame: Frame
