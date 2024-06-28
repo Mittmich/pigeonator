@@ -78,3 +78,37 @@ async def test_detections_from_event_manager_sent_correctly(detections, monkeypa
             ],
         },
     )
+
+
+@pytest.mark.parametrize(
+    "effect_activation", [
+        {
+            "type": "sound",
+            "meta_information": {"detection_timestamp": datetime.datetime.now()},
+            "timestamp": datetime.datetime.now(),
+        }
+    ]
+)
+@pytest.mark.asyncio
+async def test_effect_activated_from_event_manager_sent_correctly(effect_activation,monkeypatch, mock_requests):
+    """Test whether effect activated events are sent correctly."""
+    monkeypatch.setattr("birdhub.remote_events.requests", mock_requests)
+    dispatcher = EventDispatcher("http://localhost:5000", ["effect_activated"])
+    event_manager = VideoEventManager(stream=MagicMock(),event_dispatcher=dispatcher)
+    # start dispatcher thread
+    dispatcher.run()
+    # send effect activated event via event manager
+    await event_manager.notify("effect_activated",effect_activation)
+    # sleep to wait for dispatcher to process the request
+    await asyncio.sleep(1)
+    # check if request was sent correctly
+    mock_requests.post.assert_called_once()
+    mock_requests.post.assert_called_with(
+        "http://localhost:5000/effectorAction/",
+        json={
+            "action": effect_activation["type"],
+            "action_metadata": effect_activation["meta_information"],
+            "detection_timestamp": effect_activation["meta_information"]["detection_timestamp"],
+            "action_timestamp": effect_activation["timestamp"],
+        },
+    )
