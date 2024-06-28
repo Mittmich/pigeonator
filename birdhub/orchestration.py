@@ -30,36 +30,36 @@ class VideoEventManager(Mediator):
         recorder: Optional["Recorder"] = None,
         detector: Optional["Detector"] = None,
         effector: Optional["Effector"] = None,
+        event_dispatcher: Optional["EventDispatcher"] = None,
         max_buffer_size: int = 500,
-        max_delay: int = 5 # seconds
+        max_delay: int = 5,  # seconds
     ) -> None:
         self._stream = stream
         self._recorder = recorder
         self._detector = detector
         self._effector = effector
+        self._event_dispatcher = event_dispatcher
         self._detections_logged = 0
         self._pipes = {}
         self._event_queue = None
         self._max_delay = max_delay
         self._image_store = ImageStore(number_images=max_buffer_size)
-        # register mediator object
-        if self._recorder is not None:
-            self._recorder.add_event_manager(self)
-        if self._detector is not None:
-            self._detector.add_event_manager(self)
-        if self._effector is not None:
-            self._effector.add_event_manager(self)
-
+        # sregister components
+        for component in [
+            self._recorder,
+            self._detector,
+            self._effector,
+            self._event_dispatcher,
+        ]:
+            if component is not None:
+                component.add_event_manager(self)
 
     async def notify(self, event: str, data: object) -> None:
         if event == "video_frame":
-            # log size of queue
-            #logger.log_event('queue_size', self._event_queue.qsize(), level=logging.DEBUG)
             # drop frames if they are not recent
             if datetime.now() - data.timestamp > timedelta(seconds=self._max_delay):
                 return
             if self._detector is not None:
-                #logger.log_event('sent_frame',f'Sent frame {data.timestamp}')
                 self._pipes["detector"].send(data)
             if self._recorder is not None:
                 self._pipes["recorder"].send(data)
@@ -69,12 +69,17 @@ class VideoEventManager(Mediator):
                 self._pipes["recorder"].send(data)
             if self._effector is not None:
                 self._pipes["effector"].send(data)
+            if self._event_dispatcher is not None:
+                self._pipes["event_dispatcher"].send((event, data))
         if event == "effect_activated":
             logger.log_event("effect_activated", data.get("meta_information", None))
             if self._recorder is not None:
                 self._pipes["recorder"].send(data)
-        # sleep to avoid busy wating
-        #await asyncio.sleep(0.2)
+            if self._event_dispatcher is not None:
+                self._pipes["event_dispatcher"].send((event, data))
+        if event == "recording_stopped":
+            if self._event_dispatcher is not None:
+                self._pipes["event_dispatcher"].send((event, data))
 
     def register_pipe(self, name: str, pipe: Pipe):
         """Registers pipe with event manager."""

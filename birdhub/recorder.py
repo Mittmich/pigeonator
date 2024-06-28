@@ -1,6 +1,7 @@
 """Collection of recorder objects"""
 from abc import ABC, abstractmethod
 import os
+from pathlib import Path
 from datetime import datetime, timedelta
 import logging
 import cv2
@@ -111,6 +112,7 @@ class EventRecorder(Recorder):
         self._recording = False
         self._detection_slack = detection_slack
         self._activations = []
+        self._current_detection_video_file = None
 
     def _get_detection_output_file(self):
         return os.path.join(self._outputDir, f"{self._get_timestamp()}_detections.mp4")
@@ -172,6 +174,7 @@ class EventRecorder(Recorder):
         if self._detection_writer:
             self._detection_writer.release()
             self._detection_writer = None
+            self._current_detection_video_file = None
 
     def _update_detections(self, detection_data):
         detection_frames = self.create_detection_frames(detection_data)
@@ -193,8 +196,9 @@ class EventRecorder(Recorder):
             for frame in self._detections:
                 self._add_activation(frame, activation, write_timestamps)
         if self._detection_writer is None:
+            self._current_detection_video_file = self._get_detection_output_file()
             self._detection_writer = self._detection_writer_factory(
-                self._get_detection_output_file(), self._fps, self._frame_size
+                self._current_detection_video_file, self._fps, self._frame_size
             )
         for detection_frame in self._detections:
             # retrive image from buffer
@@ -251,6 +255,16 @@ class EventRecorder(Recorder):
                         "recording_stopped",
                         "event recording stopped",
                         logging.INFO
+            )
+            # sebd end of recording event to event manager
+            self._event_manager_connection.send(
+                ("recording_stopped", 
+                    {
+                        "recording_end_timestamp": datetime.now().strftime("%Y%m%d_%H%M%S"),
+                        "recording_file": self._current_detection_video_file,
+                        "recording_timestamp": Path(self._current_detection_video_file).name.split("_")[0]
+                    }
+                )
             )
             # write detections
             self._update_detections([])
