@@ -10,6 +10,7 @@ from birdhub.detection import (
 from birdhub.video import RTSPStream, RaspberryPiStream
 from birdhub.logging import logger
 from birdhub.effectors import EFFECTORS
+from birdhub.remote_events import EventDispatcher
 from datetime import timedelta
 
 
@@ -98,6 +99,7 @@ def birds(url, outputdir, fps, slack, model):
 @click.option("--minimum_number_detections", type=int, default=5)
 @click.option("--stream_type", type=str, default="rtsp")
 @click.option("--motion_th_area", type=int, default=2_000)
+@click.option("--bh_server", type=str, default=None)
 def deter(
     url,
     outputdir,
@@ -110,7 +112,8 @@ def deter(
     minimum_number_detections,
     sound_path,
     stream_type,
-    motion_th_area
+    motion_th_area,
+    bh_server
 ):
     if stream_type == 'rtsp':
         stream = RTSPStream(url)
@@ -126,6 +129,10 @@ def deter(
         )
     else:
         recorder = None
+    if bh_server:
+        dispatcher = EventDispatcher(bh_server)
+    else:
+        dispatcher = None
     motion_detector = SimpleMotionDetector(threshold_area=motion_th_area, activation_frames=1, max_delay=2)
     bird_detector = BirdDetectorYolov5(model, confidence_threshold=0.6, max_delay=2, threshold_area=motion_th_area)
     motion_activated_detector = MotionActivatedSingleClassDetector(
@@ -145,6 +152,7 @@ def deter(
         recorder=recorder,
         detector=motion_activated_detector,
         effector=effector,
+        dispatcher=dispatcher
     )
     asyncio.run(event_manager.run())
 
