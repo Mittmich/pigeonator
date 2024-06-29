@@ -9,6 +9,7 @@ import subprocess
 from multiprocessing import Pipe
 from birdhub.orchestration import Mediator
 from requests.exceptions import RequestException
+from requests.auth import HTTPBasicAuth
 from birdhub.detection import Detection
 from birdhub.logging import logger
 
@@ -29,7 +30,7 @@ def log_request_error(func):
 
 
 @log_request_error
-def send_detection(server_address: str, data: list[Detection]):
+def send_detection(server_address: str, data: list[Detection], user: str = None, password: str = None, verify_ssl: bool = True):
     """Send detection data to the remote server."""
     # get first detection to derive the timestamp
     data = data[0]
@@ -44,11 +45,13 @@ def send_detection(server_address: str, data: list[Detection]):
                 }
             ],
         },
+        verify=verify_ssl,
+        auth=HTTPBasicAuth(user, password) if user and password else None,
     )
 
 
 @log_request_error
-def send_effect_activated(server_address: str, data: dict):
+def send_effect_activated(server_address: str, data: dict, user: str = None, password: str = None, verify_ssl: bool = True):
     """Send effect activated data to the remote server."""
     return requests.post(
         f"{server_address}/effectorAction/",
@@ -58,11 +61,13 @@ def send_effect_activated(server_address: str, data: dict):
             "detection_timestamp": data["meta_information"]["detection_timestamp"].strftime("%Y-%m-%dT%H:%M:%S"),
             "action_timestamp": data["timestamp"].strftime("%Y-%m-%dT%H:%M:%S"),
         },
+        verify=verify_ssl,
+        auth=HTTPBasicAuth(user, password) if user and password else None,
     )
 
 
 @log_request_error
-def send_recording_stopped(server_address: str, data: dict):
+def send_recording_stopped(server_address: str, data: dict, user: str = None, password: str = None, verify_ssl: bool = True):
     """Send recording stopped data to the remote server."""
     # create smaller video using ffmpeg
     small_video_file = data["recording_file"] + "_small.mp4"
@@ -94,6 +99,8 @@ def send_recording_stopped(server_address: str, data: dict):
                 "recording_timestamp": data["recording_timestamp"].strftime("%Y-%m-%dT%H:%M:%S"),
                 "recording_end_timestamp": data["recording_end_timestamp"].strftime("%Y-%m-%dT%H:%M:%S"),
             },
+            verify=verify_ssl,
+            auth=HTTPBasicAuth(user, password) if user and password else None,
         )
     # remove small video file
     shutil.rmtree(small_video_file)
@@ -108,9 +115,12 @@ class EventDispatcher:
         "recording_stopped": send_recording_stopped,
     }
 
-    def __init__(self, server_address: str, listening_for: Optional[list[str]] = None):
+    def __init__(self, server_address: str, listening_for: Optional[list[str]] = None, user: str = None, password: str = None, verify_ssl: bool = True):
         """Initialize the EventDispatcher object."""
         self._server_address = server_address
+        self._user = user
+        self._password = password
+        self._verify_ssl = verify_ssl
         if listening_for is None:
             listening_for = self.EVENT_HANDLERS.keys()
         if not all(

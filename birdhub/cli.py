@@ -100,6 +100,9 @@ def birds(url, outputdir, fps, slack, model):
 @click.option("--stream_type", type=str, default="rtsp")
 @click.option("--motion_th_area", type=int, default=2_000)
 @click.option("--bh_server", type=str, default=None)
+@click.option('--bh_user', type=str, default=None)
+@click.option('--bh_password', type=str, default=None)
+@click.option('--bh_verify_ssl', type=bool, default=True)
 def deter(
     url,
     outputdir,
@@ -113,7 +116,10 @@ def deter(
     sound_path,
     stream_type,
     motion_th_area,
-    bh_server
+    bh_server,
+    bh_user,
+    bh_password,
+    bh_verify_ssl,
 ):
     if stream_type == 'rtsp':
         stream = RTSPStream(url)
@@ -130,7 +136,7 @@ def deter(
     else:
         recorder = None
     if bh_server:
-        dispatcher = EventDispatcher(bh_server)
+        dispatcher = EventDispatcher(bh_server, user=bh_user, password=bh_password, verify_ssl=bh_verify_ssl)
     else:
         dispatcher = None
     motion_detector = SimpleMotionDetector(threshold_area=motion_th_area, activation_frames=1, max_delay=2)

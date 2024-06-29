@@ -80,6 +80,8 @@ async def test_detections_from_event_manager_sent_correctly(detections, monkeypa
                 }
             ],
         },
+        verify=True,
+        auth=None,
     )
 
 
@@ -114,6 +116,8 @@ async def test_effect_activated_from_event_manager_sent_correctly(effect_activat
             "detection_timestamp": effect_activation["meta_information"]["detection_timestamp"].strftime("%Y-%m-%dT%H:%M:%S"),
             "action_timestamp": effect_activation["timestamp"].strftime("%Y-%m-%dT%H:%M:%S"),
         },
+        verify=True,
+        auth=None,
     )
 
 @pytest.mark.parametrize(
