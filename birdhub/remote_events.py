@@ -4,6 +4,8 @@ import requests
 from threading import Thread
 from typing import Optional
 from pathlib import Path
+import shutil
+import subprocess
 from multiprocessing import Pipe
 from birdhub.orchestration import Mediator
 from requests.exceptions import RequestException
@@ -62,7 +64,27 @@ def send_effect_activated(server_address: str, data: dict):
 @log_request_error
 def send_recording_stopped(server_address: str, data: dict):
     """Send recording stopped data to the remote server."""
-    with open(data["recording_file"], "rb") as f:
+    # create smaller video using ffmpeg
+    small_video_file = data["recording_file"] + "_small.mp4"
+    subprocess.run(
+        [
+            # ffmpeg -i test.mp4 -c:v libx265 -s 640x320 -crf 27 -c:a copy output.mp4
+            "ffmpeg",
+            "-i",
+            data["recording_file"],
+            "-c:v",
+            "libx265",
+            "-s",
+            "640x320",
+            "-crf",
+            "27",
+            "-c:a",
+            "copy",
+            small_video_file,
+        ],
+        check=True,
+    )
+    with open(small_video_file, "rb") as f:
         return requests.post(
             f"{server_address}/recordings/",
             files={
@@ -73,6 +95,8 @@ def send_recording_stopped(server_address: str, data: dict):
                 "recording_end_timestamp": data["recording_end_timestamp"].strftime("%Y-%m-%dT%H:%M:%S"),
             },
         )
+    # remove small video file
+    shutil.rmtree(small_video_file)
 
 
 class EventDispatcher:

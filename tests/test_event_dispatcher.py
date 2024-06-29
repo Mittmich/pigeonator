@@ -75,8 +75,8 @@ async def test_detections_from_event_manager_sent_correctly(detections, monkeypa
             "detections": [
                 {
                     "detected_class": detections[0].get('meta_information')["most_likely_object"],
-                    "detection_timestamp": detections[0].get("frame_timestamp"),
-                    "confidence": detections[0].get("mean_confidence"),
+                    "detection_timestamp": detections[0].get("frame_timestamp").strftime("%Y-%m-%dT%H:%M:%S"),
+                    "confidence": detections[0].get("meta_information")["mean_confidence"],
                 }
             ],
         },
@@ -111,8 +111,8 @@ async def test_effect_activated_from_event_manager_sent_correctly(effect_activat
         json={
             "action": effect_activation["type"],
             "action_metadata": effect_activation["meta_information"],
-            "detection_timestamp": effect_activation["meta_information"]["detection_timestamp"],
-            "action_timestamp": effect_activation["timestamp"],
+            "detection_timestamp": effect_activation["meta_information"]["detection_timestamp"].strftime("%Y-%m-%dT%H:%M:%S"),
+            "action_timestamp": effect_activation["timestamp"].strftime("%Y-%m-%dT%H:%M:%S"),
         },
     )
 
@@ -120,7 +120,7 @@ async def test_effect_activated_from_event_manager_sent_correctly(effect_activat
     "recording_data", [
         {
             "recording_file": r"tests\testfiles\test_video.mp4",
-            "recording_time": datetime.datetime.now(),
+            "recording_timestamp": datetime.datetime.now(),
             "recording_end_timestamp": datetime.datetime.now(),
         }
     ]
