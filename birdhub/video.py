@@ -377,7 +377,7 @@ class VideoWriter:
         self.fps = fps
         self.frameSize = frameSize
         self.videoWriter = cv2.VideoWriter(
-            filename, cv2.VideoWriter_fourcc(*"MJPG"), fps, frameSize
+            filename, cv2.VideoWriter_fourcc(*"mp4v"), fps, frameSize
         )
 
     def write(self, frame):
