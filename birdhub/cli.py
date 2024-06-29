@@ -102,7 +102,7 @@ def birds(url, outputdir, fps, slack, model):
 @click.option("--bh_server", type=str, default=None)
 @click.option('--bh_user', type=str, default=None)
 @click.option('--bh_password', type=str, default=None)
-@click.option('--bh_verify_ssl', type=bool, default=True)
+@click.option('--bh_verify_ssl', type=bool, default=False)
 def deter(
     url,
     outputdir,
