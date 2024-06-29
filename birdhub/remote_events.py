@@ -30,7 +30,7 @@ def log_request_error(func):
 
 
 @log_request_error
-def send_detection(server_address: str, data: list[Detection], user: str = None, password: str = None, verify_ssl: bool = True):
+def send_detection(server_address: str, data: list[Detection], user: str = None, password: str = None, verify_ssl: bool = False):
     """Send detection data to the remote server."""
     # get first detection to derive the timestamp
     data = data[0]
@@ -51,7 +51,7 @@ def send_detection(server_address: str, data: list[Detection], user: str = None,
 
 
 @log_request_error
-def send_effect_activated(server_address: str, data: dict, user: str = None, password: str = None, verify_ssl: bool = True):
+def send_effect_activated(server_address: str, data: dict, user: str = None, password: str = None, verify_ssl: bool = False):
     """Send effect activated data to the remote server."""
     return requests.post(
         f"{server_address}/effectorAction/",
@@ -67,7 +67,7 @@ def send_effect_activated(server_address: str, data: dict, user: str = None, pas
 
 
 @log_request_error
-def send_recording_stopped(server_address: str, data: dict, user: str = None, password: str = None, verify_ssl: bool = True):
+def send_recording_stopped(server_address: str, data: dict, user: str = None, password: str = None, verify_ssl: bool = False):
     """Send recording stopped data to the remote server."""
     # create smaller video using ffmpeg
     small_video_file = data["recording_file"] + "_small.mp4"
@@ -149,4 +149,4 @@ class EventDispatcher:
     def register_event(self, event: str, data: dict):
         """Register event and send to remote server if dispatcher listens to events."""
         if event in self._listening_for:
-            self.EVENT_HANDLERS[event](self._server_address, data)
+            self.EVENT_HANDLERS[event](self._server_address, data, self._user, self._password, self._verify_ssl)
