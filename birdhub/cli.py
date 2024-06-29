@@ -152,7 +152,7 @@ def deter(
         recorder=recorder,
         detector=motion_activated_detector,
         effector=effector,
-        dispatcher=dispatcher
+        event_dispatcher=dispatcher
     )
     asyncio.run(event_manager.run())
 

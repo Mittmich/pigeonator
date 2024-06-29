@@ -21,7 +21,7 @@ def log_request_error(func):
             response.raise_for_status()
             return response
         except RequestException as e:
-            logger.error(f"Error sending data to remote server: {e}")
+            logger.error(f"Error sending data to remote server: {e}\nRequest body: {response.json()}")
 
     return wrapper
 
@@ -37,8 +37,8 @@ def send_detection(server_address: str, data: list[Detection]):
             "detections": [
                 {
                     "detected_class": data.get('meta_information')["most_likely_object"],
-                    "detection_timestamp": data.get("frame_timestamp"),
-                    "confidence": data.get("mean_confidence"),
+                    "detection_timestamp": data.get("frame_timestamp").strftime("%Y-%m-%dT%H:%M:%S"),
+                    "confidence": data.get("meta_information")['mean_confidence'],
                 }
             ],
         },
@@ -53,8 +53,8 @@ def send_effect_activated(server_address: str, data: dict):
         json={
             "action": data["type"],
             "action_metadata": data["meta_information"],
-            "detection_timestamp": data["meta_information"]["detection_timestamp"],
-            "action_timestamp": data["timestamp"],
+            "detection_timestamp": data["meta_information"]["detection_timestamp"].strftime("%Y-%m-%dT%H:%M:%S"),
+            "action_timestamp": data["timestamp"].strftime("%Y-%m-%dT%H:%M:%S"),
         },
     )
 
@@ -69,8 +69,8 @@ def send_recording_stopped(server_address: str, data: dict):
                 "file": (Path(data["recording_file"]).name, f, "video/mp4"),
             },
             data={
-                "recording_timestamp": data["recording_time"],
-                "recording_end_timestamp": data["recording_end_timestamp"],
+                "recording_timestamp": data["recording_timestamp"].strftime("%Y-%m-%dT%H:%M:%S"),
+                "recording_end_timestamp": data["recording_end_timestamp"].strftime("%Y-%m-%dT%H:%M:%S"),
             },
         )
 
@@ -87,12 +87,12 @@ class EventDispatcher:
     def __init__(self, server_address: str, listening_for: Optional[list[str]] = None):
         """Initialize the EventDispatcher object."""
         self._server_address = server_address
-        if listening_for is not None and not all(
+        if listening_for is None:
+            listening_for = self.EVENT_HANDLERS.keys()
+        if not all(
             [event in self.EVENT_HANDLERS for event in listening_for]
         ):
             raise ValueError("Invalid event type.")
-        else:
-            listening_for = self.EVENT_HANDLERS.keys()
         self._listening_for = listening_for
 
     def run(self):

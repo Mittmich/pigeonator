@@ -108,6 +108,8 @@ class VideoEventManager(Mediator):
             self._recorder.run(self._image_store)
         if self._effector is not None:
             self._effector.run()
+        if self._event_dispatcher is not None:
+            self._event_dispatcher.run()
         # start workers
         tasks = [
             asyncio.create_task(self.process_notify(self._event_queue)),

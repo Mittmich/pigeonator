@@ -113,6 +113,7 @@ class EventRecorder(Recorder):
         self._detection_slack = detection_slack
         self._activations = []
         self._current_detection_video_file = None
+        self._recording_starttime = None
 
     def _get_detection_output_file(self):
         return os.path.join(self._outputDir, f"{self._get_timestamp()}_detections.mp4")
@@ -175,6 +176,7 @@ class EventRecorder(Recorder):
             self._detection_writer.release()
             self._detection_writer = None
             self._current_detection_video_file = None
+            self._recording_starttime = None
 
     def _update_detections(self, detection_data):
         detection_frames = self.create_detection_frames(detection_data)
@@ -256,21 +258,23 @@ class EventRecorder(Recorder):
                         "event recording stopped",
                         logging.INFO
             )
-            # sebd end of recording event to event manager
-            self._event_manager_connection.send(
-                ("recording_stopped", 
-                    {
-                        "recording_end_timestamp": datetime.now().strftime("%Y%m%d_%H%M%S"),
-                        "recording_file": self._current_detection_video_file,
-                        "recording_timestamp": Path(self._current_detection_video_file).name.split("_")[0]
-                    }
-                )
-            )
             # write detections
             self._update_detections([])
             self._write_detections()
+            # save current detection file
+            last_detection_file = self._current_detection_video_file
+            last_recording_start = self._recording_starttime
             self._recording = False
             self._destroy_writers()
+            self._event_manager_connection.send(
+                ("recording_stopped", 
+                    {
+                        "recording_end_timestamp": datetime.now(),
+                        "recording_file": last_detection_file,
+                        "recording_timestamp": last_recording_start
+                    }
+                )
+            )
 
     def register_detection(self, detection_data):
         if self._writer:
@@ -284,6 +288,7 @@ class EventRecorder(Recorder):
                         "event recording started",
                         logging.INFO
             )
+            self._recording_starttime = datetime.now()
             self._writer = self._writer_factory(
                 self._get_recording_output_file(), self._fps, self._frame_size
             )

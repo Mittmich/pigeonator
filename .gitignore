@@ -15,3 +15,4 @@ train_model/wandb/*
 env/*
 train_model/dataset_v9/*
 env/*
+*.mp4

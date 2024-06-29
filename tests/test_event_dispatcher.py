@@ -19,19 +19,21 @@ def mock_requests():
 
 
 @pytest.mark.parametrize(
-    "event_type, success", [
-        (["detection"], True),
-        (["effect_activated", 'detection'], True),
-        (['bad_type'], False),
+    "event_type, success, exp", [
+        (["detection"], True, ["detection"]),
+        (["effect_activated", 'detection'], True, ["effect_activated", 'detection']),
+        (['bad_type'], False, None),
+        (None, True, ['detection',"effect_activated", 'recording_stopped'])
     ]
 )
-def test_instantiation(event_type, success):
+def test_instantiation(event_type, success, exp):
     """Test that instantiation fails with invalid event type."""
     if not success:
         with pytest.raises(ValueError):
             EventDispatcher("http://localhost:5000", ["invalid_event_type"])
     else:
-        EventDispatcher("http://localhost:5000", event_type)
+        disptacher = EventDispatcher("http://localhost:5000", event_type)
+        assert sorted(disptacher._listening_for) == sorted(exp)
 
 
 
