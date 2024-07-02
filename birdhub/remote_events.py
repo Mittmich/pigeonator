@@ -24,7 +24,11 @@ def log_request_error(func):
             response.raise_for_status()
             return response
         except RequestException as e:
-            logger.error(f"Error sending data to remote server: {e}\nRequest body: {response.json()}")
+            try:
+                json_response = response.json()
+            except BaseException:
+                json_response = "No response body"
+            logger.error(f"Error sending data to remote server: {e}\nRequest body: {json_response}")
 
     return wrapper
 
@@ -58,7 +62,7 @@ def send_effect_activated(server_address: str, data: dict, user: str = None, pas
         json={
             "action": data["type"],
             "action_metadata": data["meta_information"],
-            "detection_timestamp": data["meta_information"]["detection_timestamp"].strftime("%Y-%m-%dT%H:%M:%S"),
+            "detection_timestamp": data["meta_information"]["detecton_timestamp"],
             "action_timestamp": data["timestamp"].strftime("%Y-%m-%dT%H:%M:%S"),
         },
         verify=verify_ssl,
