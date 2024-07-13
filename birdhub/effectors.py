@@ -74,9 +74,7 @@ class MockEffector(Effector):
                 activation_time = datetime.now()
                 detection_time = detection.get("frame_timestamp", None)
                 if detection_time is not None and isinstance(detection_time, datetime):
-                    detection_time = detection_time.isoformat(
-                        sep=" ", timespec="milliseconds"
-                    )
+                    detection_time = detection_time.strftime("%Y-%m-%dT%H:%M:%S")
                 self._event_manager_connection.send(
                     (
                         "effect_activated",

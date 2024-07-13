@@ -36,8 +36,8 @@ def log_request_error(func):
 @log_request_error
 def send_detection(server_address: str, data: list[Detection], user: str = None, password: str = None, verify_ssl: bool = False):
     """Send detection data to the remote server."""
-    # get first detection to derive the timestamp
-    data = data[0]
+    # get last detection to derive the timestamp
+    data = data[-1]
     return requests.post(
         f"{server_address}/detections/",
         json={
