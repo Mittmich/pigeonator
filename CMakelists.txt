@@ -1,0 +1,18 @@
+cmake_minimum_required(VERSION 3.22)
+
+project(pigeonator)
+
+
+find_package(OpenCV REQUIRED)
+include_directories( ${OpenCV_INCLUDE_DIRS} )
+
+
+add_executable(pgn birdhub/birdhub.cpp)
+target_link_libraries(pgn ${OpenCV_LIBS})
+
+
+# tests
+
+find_package(doctest CONFIG REQUIRED)
+add_executable(tests tests/tests.cpp)
+target_link_libraries(tests PRIVATE doctest::doctest)

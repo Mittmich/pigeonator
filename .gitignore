@@ -16,3 +16,6 @@ env/*
 train_model/dataset_v9/*
 env/*
 *.mp4
+birdhub-python/*
+tests-python/*
+vcpkg_installed/*
