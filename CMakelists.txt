@@ -6,6 +6,11 @@ project(pigeonator)
 find_package(OpenCV REQUIRED)
 include_directories( ${OpenCV_INCLUDE_DIRS} )
 
+# add shared video library
+
+add_subdirectory(birdhub/video)
+
+# app
 
 add_executable(pgn birdhub/birdhub.cpp)
 target_link_libraries(pgn ${OpenCV_LIBS})
@@ -14,5 +19,9 @@ target_link_libraries(pgn ${OpenCV_LIBS})
 # tests
 
 find_package(doctest CONFIG REQUIRED)
-add_executable(tests tests/tests.cpp)
-target_link_libraries(tests PRIVATE doctest::doctest)
+add_executable(test_video tests/test_video.cpp)
+target_include_directories(test_video PUBLIC
+                          "${PROJECT_BINARY_DIR}"
+                          "${PROJECT_SOURCE_DIR}/birdhub/video"
+                          )
+target_link_libraries(test_video PRIVATE doctest::doctest ${OpenCV_LIBS})
