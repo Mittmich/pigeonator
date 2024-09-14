@@ -6,7 +6,8 @@
 int main() {
     try {
         // Create the camera capture object with the desired settings
-        CameraCapture camera("/dev/video0", 640, 480, V4L2_PIX_FMT_MJPEG);
+        V4l2CameraCapture camera("/dev/video0", 640, 480, V4L2_PIX_FMT_MJPEG);
+        camera.startStreaming();
 
         // Define the codec and create a VideoWriter object to write the output video
         int fourcc = cv::VideoWriter::fourcc('m', 'p', '4', 'v');  // Codec for MP4 (MPEG-4)

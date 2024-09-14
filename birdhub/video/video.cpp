@@ -50,24 +50,30 @@ cv::Mat ImageStore::get(std::time_t timestamp)
 }
 
 
-CameraCapture::CameraCapture(const char* device, int width, int height, uint32_t pixel_format, bool non_blocking = false)
-    : device_(device), width_(width), height_(height), pixel_format_(pixel_format), fd_(-1), non_blocking_(non_blocking) {
+V4l2CameraCapture::V4l2CameraCapture(const char* device, int width, int height, uint32_t pixel_format, bool non_blocking = false)
+    : device_(device), width_(width), height_(height), pixel_format_(pixel_format), fd_(-1), non_blocking_(non_blocking) {}
+
+void V4l2CameraCapture::startStreaming() {
     if (!openDevice()) {
         throw std::runtime_error("Failed to open camera device");
     }
     if (!initDevice()) {
         throw std::runtime_error("Failed to initialize camera device");
     }
+    started = true;
 }
 
 // Destructor
-CameraCapture::~CameraCapture() {
-    stopStreaming();
-    cleanup();
+V4l2CameraCapture::~V4l2CameraCapture() {
+    this->stopStreaming();
+    this->cleanup();
 }
 
 // Method to get the next frame as an OpenCV Mat
-cv::Mat CameraCapture::getNextFrame() {
+cv::Mat V4l2CameraCapture::getNextFrame() {
+    if (!started) {
+        throw std::runtime_error("V4l2CameraCapture not started");
+    }
     v4l2_buffer buf = {0};
     buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     buf.memory = V4L2_MEMORY_MMAP;
@@ -105,7 +111,7 @@ cv::Mat CameraCapture::getNextFrame() {
 }
 
 
-bool CameraCapture::openDevice() {
+bool V4l2CameraCapture::openDevice() {
     // Open the camera device with or without non-blocking mode
     fd_ = open(device_, O_RDWR | (non_blocking_ ? O_NONBLOCK : 0));
     if (fd_ == -1) {
@@ -115,7 +121,7 @@ bool CameraCapture::openDevice() {
     return true;
 }
 
-bool CameraCapture::initDevice() {
+bool V4l2CameraCapture::initDevice() {
     // Query capabilities
     v4l2_capability cap;
     if (ioctl(fd_, VIDIOC_QUERYCAP, &cap) == -1) {
@@ -183,14 +189,15 @@ bool CameraCapture::initDevice() {
     return true;
 }
 
-void CameraCapture::stopStreaming() {
+void V4l2CameraCapture::stopStreaming() {
     v4l2_buf_type type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     if (ioctl(fd_, VIDIOC_STREAMOFF, &type) == -1) {
         std::cerr << "Failed to stop streaming" << std::endl;
     }
+    started = false;
 }
 
-void CameraCapture::cleanup() {
+void V4l2CameraCapture::cleanup() {
     // Unmap buffers
     for (auto& buffer : buffers_) {
         munmap(buffer, width_ * height_ * 2);  // 2 bytes per pixel for YUYV (adjust for other formats if necessary)
@@ -199,3 +206,43 @@ void CameraCapture::cleanup() {
         close(fd_);
     }
     }
+
+
+Stream::Stream(ImageStore &image_store, CameraCapture *cam_capture, bool write_timestamps)
+    : image_store(image_store), cam_capture(cam_capture), write_timestamps(write_timestamps) {
+}
+
+void Stream::register_frame_queue(std::queue<FrameToken> *frame_queue) {
+    this->frame_queue = frame_queue;
+}
+
+void Stream::start() {
+    // set running flag that is used to stop the thread
+    this->running = true;
+    // start thread
+    this->queue_thread = std::thread(&Stream::_start, this);
+}
+
+void Stream::stop() {
+    // set running flag to false to stop the thread
+    this->running = false;
+    // join the thread
+    this->queue_thread.join();
+}
+
+void Stream::_start() {
+    while (this->running) {
+        enque_frame_token(this->frame_queue);
+    }
+}
+
+void Stream::enque_frame_token(std::queue<FrameToken> *frame_queue) {
+    cv::Mat frame = cam_capture->getNextFrame();
+    if (frame.empty()) {
+        return;
+    }
+    std::time_t timestamp = std::time(0);
+    FrameToken token = {timestamp, timestamp};
+    image_store.put(timestamp, frame);
+    frame_queue->push(token);
+}
