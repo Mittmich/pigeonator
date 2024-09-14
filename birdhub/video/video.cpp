@@ -19,7 +19,7 @@ ImageStore::ImageStore(int size)
     this->size = size;
 }
 
-void ImageStore::put(std::time_t timestamp, cv::Mat image)
+void ImageStore::put(std::time_t timestamp, cv::Mat &image)
 {
     // check if image is empty
     if (image.empty())

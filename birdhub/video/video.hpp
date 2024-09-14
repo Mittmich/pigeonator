@@ -7,6 +7,8 @@
 
 #include <ctime>
 #include <deque>
+#include <queue>
+#include <string>
 #include <map>
 #include <opencv2/opencv.hpp>
 
@@ -34,13 +36,41 @@ class ImageStore
 {
 public:
     ImageStore(int size);
-    void put(std::time_t timestamp, cv::Mat image);
+    void put(std::time_t timestamp, cv::Mat &image);
     cv::Mat get(std::time_t timestamp);
 
 private:
     int size;
     std::deque<time_t> timestamp_queue;
     std::map<std::time_t, cv::Mat> image_map;
+};
+
+enum class StreamBackend
+{
+    OPENCV,
+    LIBCAMERA
+};
+
+class Stream
+/*
+    Represents a stream. Implements methods to
+    start the stream, and get frames.
+*/
+{
+public:
+    Stream(
+        std::string stream_source,
+        ImageStore &image_store,
+        bool write_timestamps = true,
+        StreamBackend backend = StreamBackend::OPENCV);
+    void start(std::queue<Frame> &frame_queue);
+
+private:
+    Frame get_frame();
+    ImageStore &image_store;
+    std::string stream_source;
+    bool write_timestamps;
+    StreamBackend backend;
 };
 
 #endif

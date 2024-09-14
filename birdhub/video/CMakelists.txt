@@ -1,1 +1,2 @@
 add_library(Video video.hpp video.cpp)
+target_include_directories(Video PUBLIC ${OpenCV_INCLUDE_DIRS})
