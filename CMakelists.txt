@@ -18,7 +18,7 @@ add_subdirectory(birdhub/video)
 
 add_executable(pgn birdhub/birdhub.cpp)
 #target_include_directories(pgn PUBLIC ${LIBCAMERA_INCLUDE_DIRS})
-target_include_directories(pgn PRIVATE ${OpenCV_INCLUDE_DIRS} )
+target_include_directories(pgn PRIVATE "${PROJECT_BINARY_DIR}" "${PROJECT_SOURCE_DIR}/birdhub/video" ${OpenCV_INCLUDE_DIRS} )
 target_link_libraries(pgn PRIVATE ${LIBCAMERA_LIBRARIES} ${OpenCV_LIBS})
 
 

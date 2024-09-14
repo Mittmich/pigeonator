@@ -11,6 +11,13 @@
 #include <string>
 #include <map>
 #include <opencv2/opencv.hpp>
+#include <linux/videodev2.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/ioctl.h>
+#include <sys/mman.h>
+#include <linux/videodev2.h>
+#include <vector>
 
 const int MAX_IMAGE_STORE_SIZE = 1000;
 
@@ -45,11 +52,35 @@ private:
     std::map<std::time_t, cv::Mat> image_map;
 };
 
-enum class StreamBackend
-{
-    OPENCV,
-    LIBCAMERA
+
+class CameraCapture {
+public:
+    // Constructor
+    CameraCapture(const char* device, int width, int height, uint32_t pixel_format, bool non_blocking);
+
+    // Destructor
+    ~CameraCapture();
+
+    // Method to get the next frame as an OpenCV Mat
+    cv::Mat getNextFrame();
+
+private:
+    const char* device_;
+    int width_;
+    int height_;
+    uint32_t pixel_format_;
+    int fd_;
+    bool non_blocking_;
+    std::vector<void*> buffers_;
+
+    bool openDevice();
+    bool initDevice();
+    void stopStreaming();
+    void cleanup();
 };
+
+
+
 
 class Stream
 /*
@@ -61,8 +92,8 @@ public:
     Stream(
         std::string stream_source,
         ImageStore &image_store,
-        bool write_timestamps = true,
-        StreamBackend backend = StreamBackend::OPENCV);
+        CameraCapture cam_capture,
+        bool write_timestamps = true);
     void start(std::queue<Frame> &frame_queue);
 
 private:
@@ -70,7 +101,7 @@ private:
     ImageStore &image_store;
     std::string stream_source;
     bool write_timestamps;
-    StreamBackend backend;
+    CameraCapture cam_capture;
 };
 
 #endif
