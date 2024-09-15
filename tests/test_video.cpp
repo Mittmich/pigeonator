@@ -106,3 +106,12 @@ TEST_CASE("Single frame is enqued correctly by stream") {
     FrameToken token = frame_queue.front();
     CHECK(cv::countNonZero(store.get(token.timestamp) != img) == 0);
 }
+
+// Test stream without frame queue cannot be started
+
+TEST_CASE("Stream without frame queue cannot be started") {
+    ImageStore store(1);
+    MockCameraCapture cam_capture("test", 3, 3, V4L2_PIX_FMT_YUYV);
+    Stream stream(store, &cam_capture);
+    CHECK_THROWS_AS(stream.start(), std::runtime_error);
+}

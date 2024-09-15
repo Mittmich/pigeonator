@@ -114,6 +114,7 @@ private:
     void _start();
     std::thread queue_thread;
     bool running = false;
+    bool queye_registered = false;
 };
 
 #endif

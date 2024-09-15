@@ -214,9 +214,14 @@ Stream::Stream(ImageStore &image_store, CameraCapture *cam_capture, bool write_t
 
 void Stream::register_frame_queue(std::queue<FrameToken> *frame_queue) {
     this->frame_queue = frame_queue;
+    this->queye_registered = true;
 }
 
 void Stream::start() {
+    // check if frame queue is registered
+    if (!this->queye_registered) {
+        throw std::runtime_error("Frame queue not registered.");
+    }
     // set running flag that is used to stop the thread
     this->running = true;
     // start thread
