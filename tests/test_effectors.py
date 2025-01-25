@@ -26,7 +26,7 @@ def mock_detection_wrong_class():
 
 def test_no_detection():
     event_manager = MagicMock()
-    effector = MockEffector("correct_class", timedelta(minutes=10))
+    effector = MockEffector(["correct_class"], timedelta(minutes=10))
     effector.add_event_manager(event_manager)
 
     effector.register_detection(None)
@@ -36,7 +36,7 @@ def test_no_detection():
 
 def test_wrong_class_detection(mock_detection_wrong_class):
     event_manager = MagicMock()
-    effector = MockEffector("correct_class", timedelta(minutes=10))
+    effector = MockEffector(["correct_class"], timedelta(minutes=10))
     effector.add_event_manager(event_manager)
 
     effector.register_detection([mock_detection_wrong_class])
@@ -48,7 +48,18 @@ def test_correct_class_detection(mock_detection_correct_class, mock_pipe_connect
     connection, child_connection = mock_pipe_connection
     with patch("birdhub.effectors.Pipe", return_value=(connection, child_connection)):
         event_manager = MagicMock()
-        effector = MockEffector("correct_class", timedelta(minutes=10))
+        effector = MockEffector(["correct_class"], timedelta(minutes=10))
+        effector.add_event_manager(event_manager)
+
+        effector.register_detection([mock_detection_correct_class])
+
+        connection.send.assert_called_once()
+
+def test_correct_class_detection_multi_classes_target(mock_detection_correct_class, mock_pipe_connection):
+    connection, child_connection = mock_pipe_connection
+    with patch("birdhub.effectors.Pipe", return_value=(connection, child_connection)):
+        event_manager = MagicMock()
+        effector = MockEffector(["correct_class","some_other_class"], timedelta(minutes=10))
         effector.add_event_manager(event_manager)
 
         effector.register_detection([mock_detection_correct_class])
@@ -60,7 +71,7 @@ def test_activation_time_too_short(mock_detection_correct_class, mock_pipe_conne
     connection, child_connection = mock_pipe_connection
     with patch("birdhub.effectors.Pipe", return_value=(connection, child_connection)):
         event_manager = MagicMock()
-        effector = MockEffector("correct_class", timedelta(minutes=10))
+        effector = MockEffector(["correct_class"], timedelta(minutes=10))
         effector.add_event_manager(event_manager)
 
         # Assuming that `_last_activation` is set at the moment of activation

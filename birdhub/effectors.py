@@ -12,10 +12,10 @@ from birdhub.detection import Detection
 
 class Effector(ABC):
     def __init__(
-        self, target_class: str, cooldown_time: timedelta, config: Optional[Dict] = None
+        self, target_classes: List[str], cooldown_time: timedelta, config: Optional[Dict] = None
     ) -> None:
         self._event_manager_connection = None
-        self._target_class = target_class
+        self._target_classes = target_classes
         self._cooldown_time = cooldown_time
         self._last_activation = None
         self._config = config
@@ -68,7 +68,7 @@ class MockEffector(Effector):
             return
         for detection in data:
             if (
-                self._get_most_likely_object(detection) == self._target_class
+                self._get_most_likely_object(detection) in self._target_classes
                 and self.is_activation_allowed()
             ):
                 activation_time = datetime.now()
@@ -83,7 +83,7 @@ class MockEffector(Effector):
                             "type": "Mock Effect",
                             "meta_information": {
                                 "type": "mock",
-                                "target_class": self._target_class,
+                                "target_classes": self._target_classes,
                                 "detection_timestamp": detection_time,
                             },
                         },
@@ -107,7 +107,7 @@ class SoundEffector(Effector):
         # iterate over detections in reverse order to get the most recent detection
         for detection in data[::-1]:
             if (
-                self._get_most_likely_object(detection) == self._target_class
+                self._get_most_likely_object(detection) in self._target_classes
                 and self.is_activation_allowed()
             ):
                 activation_time = datetime.now()
@@ -126,7 +126,7 @@ class SoundEffector(Effector):
                             "type": "Audio Effector",
                             "meta_information": {
                                 "type": "audio_effector",
-                                "target_class": self._target_class,
+                                "target_classes": self._target_classes,
                                 "sound_file": self._config["sound_file"],
                                 "detecton_timestamp": detection_time,
                                 "activation_timestamp": activation_time.isoformat(
