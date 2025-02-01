@@ -22,6 +22,7 @@
 
 const int MAX_IMAGE_STORE_SIZE = 1000;
 
+// TODO: refactor to use EVENT
 struct FrameToken
 /*
     Represents a frame from the camera.

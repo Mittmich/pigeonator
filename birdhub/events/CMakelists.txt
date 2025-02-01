@@ -1,1 +1,9 @@
 add_library(Events events.hpp events.cpp)
+target_include_directories(Events
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/../video
+)
+target_link_libraries(Events
+    PUBLIC
+        Video
+)

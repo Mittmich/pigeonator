@@ -1,0 +1,18 @@
+add_library(Orchestration orchestration.hpp orchestration.cpp)
+target_include_directories(Orchestration
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/../video
+)
+target_link_libraries(Orchestration
+    PUBLIC
+        Video
+)
+
+target_include_directories(Orchestration
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/../events
+)
+target_link_libraries(Orchestration
+    PUBLIC
+        Events
+)

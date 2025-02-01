@@ -10,9 +10,11 @@ find_package(OpenCV REQUIRED)
 #pkg_check_modules(LIBCAMERA REQUIRED libcamera)
 
 
-# add shared video library
+# add shared libraries
 
 add_subdirectory(birdhub/video)
+add_subdirectory(birdhub/events)
+add_subdirectory(birdhub/orchestration)
 
 # app
 
@@ -21,11 +23,6 @@ add_executable(pgn birdhub/birdhub.cpp)
 target_include_directories(pgn PRIVATE "${PROJECT_BINARY_DIR}" "${PROJECT_SOURCE_DIR}/birdhub/video" ${OpenCV_INCLUDE_DIRS} )
 target_link_libraries(pgn PRIVATE ${LIBCAMERA_LIBRARIES} ${OpenCV_LIBS})
 
-
-add_executable(pgn_class birdhub/birdhub_class.cpp)
-#target_include_directories(pgn PUBLIC ${LIBCAMERA_INCLUDE_DIRS})
-target_include_directories(pgn_class PRIVATE ${OpenCV_INCLUDE_DIRS} )
-target_link_libraries(pgn_class PRIVATE ${LIBCAMERA_LIBRARIES} ${OpenCV_LIBS})
 
 # tests
 
