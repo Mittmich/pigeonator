@@ -20,7 +20,7 @@ int main() {
         }
 
         // Capture and write frames to the video file
-        for (int i = 0; i < 20; ++i) {  // Capture 300 frames (~10 seconds of video at 30 FPS)
+        for (int i = 0; i < 40; ++i) {  // Capture 300 frames (~10 seconds of video at 30 FPS)
             cv::Mat frame = camera.getNextFrame();
             if (!frame.empty()) {
                 // Write the frame to the MP4 file

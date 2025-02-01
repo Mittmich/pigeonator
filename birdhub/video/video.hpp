@@ -31,7 +31,6 @@ struct FrameToken
 */
 {
     std::time_t timestamp;
-    std::time_t capture_time;
 };
 
 class ImageStore
@@ -55,6 +54,8 @@ private:
 
 class CameraCapture {
 public:
+    // Destructor
+    virtual ~CameraCapture() {}
     // method to start stream
     virtual void startStreaming() = 0;
     virtual void stopStreaming() = 0;
@@ -101,12 +102,14 @@ public:
         ImageStore &image_store,
         CameraCapture *cam_capture,
         bool write_timestamps = true);
+    // registering the frame queue needs to be separte from the constructor because
+    // the evenemanager needs to attach it to the stream
     void register_frame_queue(std::queue<FrameToken> *frame_queue);
     void start();
     void stop();
 
 private:
-    void enque_frame_token(std::queue<FrameToken> *frame_queue);
+    void enque_frame_token();
     ImageStore &image_store;
     bool write_timestamps;
     CameraCapture *cam_capture;
@@ -114,7 +117,7 @@ private:
     void _start();
     std::thread queue_thread;
     bool running = false;
-    bool queye_registered = false;
+    bool queue_registered = false;
 };
 
 #endif

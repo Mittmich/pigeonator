@@ -214,12 +214,12 @@ Stream::Stream(ImageStore &image_store, CameraCapture *cam_capture, bool write_t
 
 void Stream::register_frame_queue(std::queue<FrameToken> *frame_queue) {
     this->frame_queue = frame_queue;
-    this->queye_registered = true;
+    this->queue_registered = true;
 }
 
 void Stream::start() {
     // check if frame queue is registered
-    if (!this->queye_registered) {
+    if (!this->queue_registered) {
         throw std::runtime_error("Frame queue not registered.");
     }
     // set running flag that is used to stop the thread
@@ -237,17 +237,17 @@ void Stream::stop() {
 
 void Stream::_start() {
     while (this->running) {
-        enque_frame_token(this->frame_queue);
+        enque_frame_token();
     }
 }
 
-void Stream::enque_frame_token(std::queue<FrameToken> *frame_queue) {
+void Stream::enque_frame_token() {
     cv::Mat frame = cam_capture->getNextFrame();
     if (frame.empty()) {
         return;
     }
     std::time_t timestamp = std::time(0);
-    FrameToken token = {timestamp, timestamp};
+    FrameToken token = {timestamp};
     image_store.put(timestamp, frame);
-    frame_queue->push(token);
+    this->frame_queue->push(token);
 }
