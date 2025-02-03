@@ -1,6 +1,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest/doctest.h"
-#include <video.cpp>
+#include "video.hpp"
+#include "events.hpp"
 #include <ctime> 
 #include <vector>
 #include <opencv2/opencv.hpp>
@@ -95,7 +96,7 @@ TEST_CASE("Single frame is enqued correctly by stream") {
     cv::Mat img = create_random_image(3, 3);
     cam_capture.setMockFrames({img});
     Stream stream(store, &cam_capture);
-    std::queue<FrameToken> frame_queue;
+    std::queue<FrameEvent> frame_queue;
     stream.register_frame_queue(&frame_queue);
     stream.start();
     // Wait for 500 ms to allow the stream to process the frame
@@ -103,8 +104,8 @@ TEST_CASE("Single frame is enqued correctly by stream") {
     // stop the stream
     stream.stop();
     CHECK(frame_queue.size() == 1);
-    FrameToken token = frame_queue.front();
-    CHECK(cv::countNonZero(store.get(token.timestamp) != img) == 0);
+    FrameEvent frame_event = frame_queue.front();
+    CHECK(cv::countNonZero(store.get(frame_event.get_timestamp()) != img) == 0);
 }
 
 // Test stream without frame queue cannot be started

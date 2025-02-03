@@ -19,20 +19,9 @@
 #include <linux/videodev2.h>
 #include <vector>
 #include <thread>
+#include "events.hpp"
 
 const int MAX_IMAGE_STORE_SIZE = 1000;
-
-// TODO: refactor to use EVENT
-struct FrameToken
-/*
-    Represents a frame from the camera.
-    Contains the frame data and the timestamp of the frame.
-    The timestamp for each frame is unique and serves
-    as id to retrive the data from the shared image store.
-*/
-{
-    std::time_t timestamp;
-};
 
 class ImageStore
 /*
@@ -105,7 +94,7 @@ public:
         bool write_timestamps = true);
     // registering the frame queue needs to be separte from the constructor because
     // the evenemanager needs to attach it to the stream
-    void register_frame_queue(std::queue<FrameToken> *frame_queue);
+    void register_frame_queue(std::queue<FrameEvent> *frame_queue);
     void start();
     void stop();
 
@@ -114,7 +103,7 @@ private:
     ImageStore &image_store;
     bool write_timestamps;
     CameraCapture *cam_capture;
-    std::queue<FrameToken> *frame_queue;
+    std::queue<FrameEvent> *frame_queue;
     void _start();
     std::thread queue_thread;
     bool running = false;

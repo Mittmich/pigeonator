@@ -212,7 +212,7 @@ Stream::Stream(ImageStore &image_store, CameraCapture *cam_capture, bool write_t
     : image_store(image_store), cam_capture(cam_capture), write_timestamps(write_timestamps) {
 }
 
-void Stream::register_frame_queue(std::queue<FrameToken> *frame_queue) {
+void Stream::register_frame_queue(std::queue<FrameEvent> *frame_queue) {
     this->frame_queue = frame_queue;
     this->queue_registered = true;
 }
@@ -247,7 +247,7 @@ void Stream::enque_frame_token() {
         return;
     }
     std::time_t timestamp = std::time(0);
-    FrameToken token = {timestamp};
+    FrameEvent frame_event = FrameEvent(timestamp, std::nullopt);
     image_store.put(timestamp, frame);
-    this->frame_queue->push(token);
+    this->frame_queue->push(frame_event);
 }

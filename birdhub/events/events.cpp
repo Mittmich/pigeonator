@@ -22,3 +22,14 @@ std::map<std::string, std::string> Event::get_meta_data() {
     }
     return {};
 }
+
+FrameEvent::FrameEvent(
+        time_t event_timestamp,
+        std::optional<std::map<std::string, std::string>> meta_data)
+    : Event(EventType::NEW_FRAME, event_timestamp, meta_data) {}
+
+FrameEvent::~FrameEvent() = default;
+
+std::map<std::string, std::string> FrameEvent::get_meta_data() {
+    return {};
+}

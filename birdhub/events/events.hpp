@@ -2,11 +2,12 @@
     Libarary for orchestrating events
 */
 
-#include "video.hpp"
 #include <set>
 #include <map>
 #include <queue>
 #include <optional>
+#include <ctime>
+#include <string>
 
 #ifndef BIRDHUB_EVENTS_EVENTS_HPP
 #define BIRDHUB_EVENTS_EVENTS_HPP
@@ -31,9 +32,22 @@ public:
     EventType type;
     time_t get_timestamp();
     std::map<std::string, std::string> get_meta_data();
-private:
+protected:
     time_t event_timestamp;
     std::optional<std::map<std::string, std::string>> meta_data;  
+};
+
+// create a subclass of event for frame events
+
+class FrameEvent : public Event {
+public:
+    FrameEvent(
+         time_t event_timestamp,
+         std::optional<std::map<std::string,
+         std::string>> meta_data);
+    ~FrameEvent();
+    std::map<std::string, std::string> get_meta_data();
+    EventType type = EventType::NEW_FRAME;
 };
 
 #endif
