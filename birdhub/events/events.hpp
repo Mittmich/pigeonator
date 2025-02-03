@@ -49,4 +49,17 @@ public:
     EventType type = EventType::NEW_FRAME;
 };
 
+// create base class for subscribers
+
+class Subscriber {
+public:
+    virtual ~Subscriber() = default;
+    virtual std::set<EventType> listening_to() = 0;
+    virtual void start() = 0;
+    virtual void stop() = 0;
+    virtual void set_event_queue(std::queue<Event> *event_queue) = 0;
+    virtual void notify(Event event) = 0;
+};
+
+
 #endif

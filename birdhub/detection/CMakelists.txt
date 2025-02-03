@@ -1,0 +1,18 @@
+add_library(Detection detection.hpp detection.cpp)
+target_include_directories(Detection
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/../video
+)
+target_link_libraries(Detection
+    PUBLIC
+        Video
+)
+
+target_include_directories(Detection
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/../events
+)
+target_link_libraries(Detection
+    PUBLIC
+        Events
+)

@@ -208,11 +208,11 @@ void V4l2CameraCapture::cleanup() {
     }
 
 
-Stream::Stream(ImageStore &image_store, CameraCapture *cam_capture, bool write_timestamps)
+Stream::Stream(std::shared_ptr<ImageStore> image_store, CameraCapture *cam_capture, bool write_timestamps)
     : image_store(image_store), cam_capture(cam_capture), write_timestamps(write_timestamps) {
 }
 
-void Stream::register_frame_queue(std::queue<FrameEvent> *frame_queue) {
+void Stream::register_frame_queue(std::shared_ptr<std::queue<FrameEvent>> frame_queue) {
     this->frame_queue = frame_queue;
     this->queue_registered = true;
 }
@@ -248,6 +248,6 @@ void Stream::enque_frame_token() {
     }
     std::time_t timestamp = std::time(0);
     FrameEvent frame_event = FrameEvent(timestamp, std::nullopt);
-    image_store.put(timestamp, frame);
+    image_store->put(timestamp, frame);
     this->frame_queue->push(frame_event);
 }
