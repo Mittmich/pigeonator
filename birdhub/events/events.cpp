@@ -29,7 +29,3 @@ FrameEvent::FrameEvent(
     : Event(EventType::NEW_FRAME, event_timestamp, meta_data) {}
 
 FrameEvent::~FrameEvent() = default;
-
-std::map<std::string, std::string> FrameEvent::get_meta_data() {
-    return {};
-}

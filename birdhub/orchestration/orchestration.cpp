@@ -1,5 +1,4 @@
 #include "orchestration.hpp"
-#include "video.hpp"
 
 void VideoEventManager::add_subscriber(std::shared_ptr<Subscriber> subscriber) {
     // add subscriber to the  vector of subscribers
@@ -17,16 +16,11 @@ void VideoEventManager::run() {
     while (true) {
         // check frame queue
         if (!this->frame_queue.empty()) {
-            // get the frame token from the queue
-            FrameToken frame_token = this->frame_queue.front();
-            // notify all subscribers
+            FrameEvent frame_event = this->frame_queue.front();
             for (auto &subscriber : this->subscribers) {
                 // check if subscriber is listening to the frame event
                 if (subscriber->listening_to().find(EventType::NEW_FRAME) != subscriber->listening_to().end()) {
-                    // create a frame event
-                    Event event(EventType::NEW_FRAME, time(nullptr), std::nullopt);
-                    // update the subscriber
-                    subscriber->notify(event);
+                    subscriber->notify(frame_event);
                 }
             }
             // remove the frame token from the queue

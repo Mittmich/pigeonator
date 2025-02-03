@@ -41,8 +41,7 @@ private:
     Stream &stream;
     std::vector<std::shared_ptr<Subscriber>> subscribers;
     std::queue<Event> event_queue;
-    // add frame queue. TODO: Fefactor to use EVENT
-    std::queue<FrameToken> frame_queue;
+    std::queue<FrameEvent> frame_queue;
     void notify();
 };
 

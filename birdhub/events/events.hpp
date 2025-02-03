@@ -46,7 +46,6 @@ public:
          std::optional<std::map<std::string,
          std::string>> meta_data);
     ~FrameEvent();
-    std::map<std::string, std::string> get_meta_data();
     EventType type = EventType::NEW_FRAME;
 };
 
