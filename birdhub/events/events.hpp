@@ -7,6 +7,8 @@
 #include <queue>
 #include <optional>
 #include <ctime>
+#include <memory>
+#include <opencv2/opencv.hpp>
 #include <string>
 
 #ifndef BIRDHUB_EVENTS_EVENTS_HPP
@@ -49,6 +51,28 @@ public:
     EventType type = EventType::NEW_FRAME;
 };
 
+// create a subclass of event for detection events
+
+class DetectionEvent : public Event {
+public:
+    DetectionEvent(
+         time_t event_timestamp,
+         FrameEvent frame_event,
+         std::optional<std::vector<std::string>> labels = std::nullopt,
+         std::optional<std::vector<float>> confidences = std::nullopt,
+         std::optional<std::vector<cv::Rect>> bounding_boxes = std::nullopt,
+         std::optional<std::vector<int>> detection_areas = std::nullopt,
+         std::optional<std::map<std::string, std::string>> meta_data = std::nullopt);
+    ~DetectionEvent();
+    EventType type = EventType::DETECTION;
+private:
+    FrameEvent frame_event;
+    std::optional<std::vector<std::string>> labels;
+    std::optional<std::vector<float>> confidences;
+    std::optional<std::vector<cv::Rect>> bounding_boxes;
+    std::optional<std::vector<int>> detection_areas;
+};
+
 // create base class for subscribers
 
 class Subscriber {
@@ -57,7 +81,7 @@ public:
     virtual std::set<EventType> listening_to() = 0;
     virtual void start() = 0;
     virtual void stop() = 0;
-    virtual void set_event_queue(std::queue<Event> *event_queue) = 0;
+    virtual void set_event_queue(std::shared_ptr<std::queue<Event>> event_queue) = 0;
     virtual void notify(Event event) = 0;
 };
 

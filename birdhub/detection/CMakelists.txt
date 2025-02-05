@@ -1,4 +1,5 @@
 add_library(Detection detection.hpp detection.cpp)
+target_include_directories(Video PUBLIC ${OpenCV_INCLUDE_DIRS})
 target_include_directories(Detection
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/../video

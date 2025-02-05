@@ -1,1 +1,2 @@
 add_library(Events events.hpp events.cpp)
+target_include_directories(Events PUBLIC ${OpenCV_INCLUDE_DIRS})
