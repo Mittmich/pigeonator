@@ -9,3 +9,11 @@ target_link_libraries(Video
     PUBLIC
         Events
 )
+target_include_directories(Video
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/../memory_management
+)
+target_link_libraries(Video
+    PUBLIC
+        MemoryManagement
+)

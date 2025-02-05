@@ -4,52 +4,6 @@
 
 #include "video.hpp"
 
-ImageStore::ImageStore(int size)
-{
-    // check if size is negative
-    if (size <= 0)
-    {
-        throw std::invalid_argument("Size must be greater than 0.");
-    }
-    // check if size is too large
-    if (size > MAX_IMAGE_STORE_SIZE)
-    {
-        throw std::invalid_argument("Size must be less than " + std::to_string(MAX_IMAGE_STORE_SIZE) + ".");
-    }
-    this->size = size;
-}
-
-void ImageStore::put(std::time_t timestamp, cv::Mat &image)
-{
-    // check if image is empty
-    if (image.empty())
-    {
-        throw std::invalid_argument("Image must not be empty.");
-    }
-    // check if store is full
-    if (this->timestamp_queue.size() >= this->size)
-    {
-        // get front element from queue and delete it from map
-        std::time_t front = this->timestamp_queue.front();
-        this->image_map.erase(front);
-        // delete front element from queue
-        this->timestamp_queue.pop_front();
-    }
-    this->timestamp_queue.push_back(timestamp);
-    this->image_map[timestamp] = image;
-}
-
-cv::Mat ImageStore::get(std::time_t timestamp)
-{
-    // check if timestamp is in store
-    if (this->image_map.count(timestamp) == 0)
-    {
-        throw std::invalid_argument("Timestamp not found in store.");
-    }
-    return this->image_map[timestamp];
-}
-
-
 V4l2CameraCapture::V4l2CameraCapture(const char* device, int width, int height, uint32_t pixel_format, bool non_blocking = false)
     : device_(device), width_(width), height_(height), pixel_format_(pixel_format), fd_(-1), non_blocking_(non_blocking) {}
 

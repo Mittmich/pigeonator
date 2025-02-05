@@ -1,0 +1,2 @@
+add_library(MemoryManagement mm.hpp mm.cpp)
+target_include_directories(MemoryManagement PUBLIC ${OpenCV_INCLUDE_DIRS})

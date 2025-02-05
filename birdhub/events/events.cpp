@@ -49,3 +49,29 @@ DetectionEvent::DetectionEvent(
       detection_areas(detection_areas) {};
 
 DetectionEvent::~DetectionEvent() = default;
+
+FrameEvent DetectionEvent::get_frame_event()
+{
+    return frame_event;
+}
+
+std::optional<std::vector<std::string>> DetectionEvent::get_labels()
+{
+    return labels;
+}
+
+std::optional<std::vector<float>> DetectionEvent::get_confidences()
+{
+    return confidences;
+}
+
+std::optional<std::vector<cv::Rect>> DetectionEvent::get_bounding_boxes()
+{
+    return bounding_boxes;
+}
+
+std::optional<std::vector<int>> DetectionEvent::get_detection_areas()
+{
+    return detection_areas;
+}
+

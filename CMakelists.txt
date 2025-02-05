@@ -16,6 +16,7 @@ add_subdirectory(birdhub/video)
 add_subdirectory(birdhub/events)
 add_subdirectory(birdhub/orchestration)
 add_subdirectory(birdhub/detection)
+add_subdirectory(birdhub/memory_management)
 
 # app
 

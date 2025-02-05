@@ -65,6 +65,11 @@ public:
          std::optional<std::map<std::string, std::string>> meta_data = std::nullopt);
     ~DetectionEvent();
     EventType type = EventType::DETECTION;
+    FrameEvent get_frame_event();
+    std::optional<std::vector<std::string>> get_labels();
+    std::optional<std::vector<float>> get_confidences();
+    std::optional<std::vector<cv::Rect>> get_bounding_boxes();
+    std::optional<std::vector<int>> get_detection_areas();
 private:
     FrameEvent frame_event;
     std::optional<std::vector<std::string>> labels;

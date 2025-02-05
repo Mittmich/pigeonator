@@ -1,5 +1,5 @@
 add_library(Detection detection.hpp detection.cpp)
-target_include_directories(Video PUBLIC ${OpenCV_INCLUDE_DIRS})
+target_include_directories(Detection PUBLIC ${OpenCV_INCLUDE_DIRS})
 target_include_directories(Detection
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/../video
@@ -16,4 +16,12 @@ target_include_directories(Detection
 target_link_libraries(Detection
     PUBLIC
         Events
+)
+target_include_directories(Detection
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/../memory_management
+)
+target_link_libraries(Detection
+    PUBLIC
+        MemoryManagement
 )
