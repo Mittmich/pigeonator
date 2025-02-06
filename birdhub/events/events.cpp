@@ -35,42 +35,58 @@ FrameEvent::~FrameEvent() = default;
 
 DetectionEvent::DetectionEvent(
     time_t event_timestamp,
+    std::vector<Detection> detections,
+    std::optional<std::map<std::string, std::string>> meta_data)
+    : Event(EventType::DETECTION, event_timestamp, meta_data),
+      detections(detections) {};
+
+DetectionEvent::~DetectionEvent() = default;
+
+std::vector<Detection> DetectionEvent::get_detections()
+{
+    return detections;
+}
+
+Detection::Detection(
+    time_t timestamp,
     FrameEvent frame_event,
     std::optional<std::vector<std::string>> labels,
     std::optional<std::vector<float>> confidences,
     std::optional<std::vector<cv::Rect>> bounding_boxes,
     std::optional<std::vector<int>> detection_areas,
     std::optional<std::map<std::string, std::string>> meta_data)
-    : Event(EventType::DETECTION, event_timestamp, meta_data),
+    : timestamp(timestamp),
       frame_event(frame_event),
       labels(labels),
       confidences(confidences),
       bounding_boxes(bounding_boxes),
-      detection_areas(detection_areas) {};
+      detection_areas(detection_areas),
+      meta_data(meta_data) {};
 
-DetectionEvent::~DetectionEvent() = default;
+Detection::~Detection() = default;
 
-FrameEvent DetectionEvent::get_frame_event()
+
+FrameEvent Detection::get_frame_event()
 {
     return frame_event;
 }
 
-std::optional<std::vector<std::string>> DetectionEvent::get_labels()
+std::optional<std::vector<std::string>> Detection::get_labels()
 {
     return labels;
 }
 
-std::optional<std::vector<float>> DetectionEvent::get_confidences()
+std::optional<std::vector<float>> Detection::get_confidences()
 {
     return confidences;
 }
 
-std::optional<std::vector<cv::Rect>> DetectionEvent::get_bounding_boxes()
+std::optional<std::vector<cv::Rect>> Detection::get_bounding_boxes()
 {
     return bounding_boxes;
 }
 
-std::optional<std::vector<int>> DetectionEvent::get_detection_areas()
+std::optional<std::vector<int>> Detection::get_detection_areas()
 {
     return detection_areas;
 }

@@ -80,9 +80,13 @@ TEST_CASE("ImageStore drops oldest frames when size is exceeded") {
     store->put(t1, img1);
     store->put(t2, img2);
     store->put(t3, img3);
-    CHECK_THROWS_AS(store->get(1), std::invalid_argument);
-    CHECK(cv::countNonZero(store->get(t2) != img2) == 0);
-    CHECK(cv::countNonZero(store->get(t3) != img3) == 0);
+    CHECK(store->get(t1).has_value() == false);
+    CHECK(store->get(t2).has_value() == true);
+    CHECK(store->get(t3).has_value() == true);
+    cv::Mat img2_retrieved = store->get(t2).value();
+    cv::Mat img3_retrieved = store->get(t3).value();
+    CHECK(cv::countNonZero(img2_retrieved != img2) == 0);
+    CHECK(cv::countNonZero(img3_retrieved != img3) == 0);
 }
 
 
@@ -103,7 +107,8 @@ TEST_CASE("Single frame is enqued correctly by stream") {
     stream.stop();
     CHECK(frame_queue->size() == 1);
     FrameEvent frame_event = frame_queue->front();
-    CHECK(cv::countNonZero(store->get(frame_event.get_timestamp()) != img) == 0);
+    cv::Mat image_retrieved = store->get(frame_event.get_timestamp()).value();
+    CHECK(cv::countNonZero(image_retrieved != img) == 0);
 }
 
 // Test stream without frame queue cannot be started

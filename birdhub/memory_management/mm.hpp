@@ -1,4 +1,5 @@
 #include <opencv2/opencv.hpp>
+#include <optional>
 
 const int MAX_IMAGE_STORE_SIZE = 1000;
 
@@ -12,7 +13,7 @@ class ImageStore
 public:
     ImageStore(int size);
     void put(std::time_t timestamp, cv::Mat &image);
-    cv::Mat get(std::time_t timestamp);
+    std::optional<cv::Mat> get(std::time_t timestamp);
 
 private:
     int size;

@@ -35,12 +35,12 @@ void ImageStore::put(std::time_t timestamp, cv::Mat &image)
     this->image_map[timestamp] = image;
 }
 
-cv::Mat ImageStore::get(std::time_t timestamp)
+std::optional<cv::Mat> ImageStore::get(std::time_t timestamp)
 {
     // check if timestamp is in store
     if (this->image_map.count(timestamp) == 0)
     {
-        throw std::invalid_argument("Timestamp not found in store.");
+        return std::nullopt;
     }
     return this->image_map[timestamp];
 }

@@ -51,32 +51,6 @@ public:
     EventType type = EventType::NEW_FRAME;
 };
 
-// create a subclass of event for detection events
-
-class DetectionEvent : public Event {
-public:
-    DetectionEvent(
-         time_t event_timestamp,
-         FrameEvent frame_event,
-         std::optional<std::vector<std::string>> labels = std::nullopt,
-         std::optional<std::vector<float>> confidences = std::nullopt,
-         std::optional<std::vector<cv::Rect>> bounding_boxes = std::nullopt,
-         std::optional<std::vector<int>> detection_areas = std::nullopt,
-         std::optional<std::map<std::string, std::string>> meta_data = std::nullopt);
-    ~DetectionEvent();
-    EventType type = EventType::DETECTION;
-    FrameEvent get_frame_event();
-    std::optional<std::vector<std::string>> get_labels();
-    std::optional<std::vector<float>> get_confidences();
-    std::optional<std::vector<cv::Rect>> get_bounding_boxes();
-    std::optional<std::vector<int>> get_detection_areas();
-private:
-    FrameEvent frame_event;
-    std::optional<std::vector<std::string>> labels;
-    std::optional<std::vector<float>> confidences;
-    std::optional<std::vector<cv::Rect>> bounding_boxes;
-    std::optional<std::vector<int>> detection_areas;
-};
 
 // create base class for subscribers
 
@@ -90,5 +64,48 @@ public:
     virtual void notify(Event event) = 0;
 };
 
+
+class Detection {
+    public:
+    Detection(
+         time_t timestamp,
+         FrameEvent frame_event,
+         std::optional<std::vector<std::string>> labels = std::nullopt,
+         std::optional<std::vector<float>> confidences = std::nullopt,
+         std::optional<std::vector<cv::Rect>> bounding_boxes = std::nullopt,
+         std::optional<std::vector<int>> detection_areas = std::nullopt,
+         std::optional<std::map<std::string, std::string>> meta_data = std::nullopt);
+    ~Detection();
+    time_t get_timestamp();
+    FrameEvent get_frame_event();
+    std::optional<std::vector<std::string>> get_labels();
+    std::optional<std::vector<float>> get_confidences();
+    std::optional<std::vector<cv::Rect>> get_bounding_boxes();
+    std::optional<std::vector<int>> get_detection_areas();
+    std::optional<std::map<std::string, std::string>> get_meta_data();
+private:
+    time_t timestamp;
+    FrameEvent frame_event;
+    std::optional<std::vector<std::string>> labels;
+    std::optional<std::vector<float>> confidences;
+    std::optional<std::vector<cv::Rect>> bounding_boxes;
+    std::optional<std::vector<int>> detection_areas;
+    std::optional<std::map<std::string, std::string>> meta_data;
+};
+
+// create a subclass of event for detection events
+
+class DetectionEvent : public Event {
+public:
+    DetectionEvent(
+         time_t event_timestamp,
+         std::vector<Detection> detections,
+         std::optional<std::map<std::string, std::string>> meta_data = std::nullopt);
+    ~DetectionEvent();
+    EventType type = EventType::DETECTION;
+    std::vector<Detection> get_detections();
+private:
+    std::vector<Detection> detections;
+};
 
 #endif
