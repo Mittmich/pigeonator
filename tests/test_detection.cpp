@@ -127,3 +127,38 @@ TEST_CASE("MotionDetector - Respects max delay threshold") {
     auto result2 = detector.detect(event3);
     CHECK(!result2.has_value());
 }
+
+TEST_CASE("MotionDetector - Integration test with event queue") {
+    auto store = setup_image_store();
+    auto event_queue = std::make_shared<std::queue<Event>>();
+    
+    MotionDetector detector(store, 20, 3, 3, 50, 0, std::chrono::seconds(5));
+    detector.set_event_queue(event_queue);
+    detector.start();
+    
+    // Create frames with motion
+    cv::Mat img1 = create_test_image(100, 100, 0);
+    cv::Mat img2 = create_test_image(100, 100, 255);
+    
+    // Push first frame
+    time_t t1 = std::time(nullptr);
+    store->put(t1, img1);
+    FrameEvent event1(t1, std::nullopt);
+    detector.notify(event1);
+    
+    // Push second frame with motion
+    time_t t2 = t1 + 1;
+    store->put(t2, img2);
+    FrameEvent event2(t2, std::nullopt);
+    detector.notify(event2);
+    
+    // Wait for processing
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    
+    // Verify detection event in queue
+    CHECK(event_queue->size() == 1);
+    Event detection_event = event_queue->front();
+    CHECK(detection_event.type == EventType::DETECTION);
+    
+    detector.stop();
+}
