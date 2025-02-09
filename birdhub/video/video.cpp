@@ -172,6 +172,8 @@ void Stream::register_frame_queue(std::shared_ptr<std::queue<FrameEvent>> frame_
 }
 
 void Stream::start() {
+    // start camera capture
+    cam_capture->startStreaming();
     // check if frame queue is registered
     if (!this->queue_registered) {
         throw std::runtime_error("Frame queue not registered.");

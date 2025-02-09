@@ -1,5 +1,6 @@
 #include "detection.hpp"
 #include <string>
+#include <iostream>
 
 Detector::Detector(
     std::set<EventType> listening_events,
@@ -69,6 +70,8 @@ void Detector::poll_read_queue() {
     std::optional<DetectionEvent> detections = detect(event);
     // check if detections are present
     if (detections.has_value()) {
+        // print detections with a nicely formatted timestamp
+        std::cout << "Detections at " << detections.value().get_timestamp() << std::endl;
         this->event_write_queue->push(detections.value());
     }
     // remove event from read queue

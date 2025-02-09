@@ -22,8 +22,15 @@ add_subdirectory(birdhub/memory_management)
 
 add_executable(pgn birdhub/birdhub.cpp)
 #target_include_directories(pgn PUBLIC ${LIBCAMERA_INCLUDE_DIRS})
-target_include_directories(pgn PRIVATE "${PROJECT_BINARY_DIR}" "${PROJECT_SOURCE_DIR}/birdhub/video" ${OpenCV_INCLUDE_DIRS} )
-target_link_libraries(pgn PRIVATE ${LIBCAMERA_LIBRARIES} ${OpenCV_LIBS})
+target_include_directories(pgn PRIVATE 
+        "${PROJECT_BINARY_DIR}"
+        "${PROJECT_SOURCE_DIR}/birdhub/video"
+        "${PROJECT_SOURCE_DIR}/birdhub/orchestration"
+        "${PROJECT_SOURCE_DIR}/birdhub/events"
+        "${PROJECT_SOURCE_DIR}/birdhub/detection"
+        "${PROJECT_SOURCE_DIR}/birdhub/memory_management"
+        ${OpenCV_INCLUDE_DIRS} )
+target_link_libraries(pgn PRIVATE ${LIBCAMERA_LIBRARIES} ${OpenCV_LIBS} Video Events Orchestration Detection MemoryManagement)
 
 # tests
 
