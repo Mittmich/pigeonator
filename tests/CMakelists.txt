@@ -1,11 +1,27 @@
 find_package(doctest CONFIG REQUIRED)
-add_executable(all_tests main.cpp test_video.cpp test_events.cpp test_detection.cpp)
+add_library(test_utils STATIC
+    test_utils.cpp
+    test_utils.hpp
+)
+target_include_directories(test_utils PUBLIC
+    "${PROJECT_SOURCE_DIR}/birdhub/video"
+    ${OpenCV_INCLUDE_DIRS}
+)
+
+target_link_libraries(test_utils PUBLIC 
+    Video 
+    ${OpenCV_LIBS}
+)
+
+
+add_executable(all_tests main.cpp test_video.cpp test_events.cpp test_detection.cpp test_orchestration.cpp)
 target_include_directories(all_tests PUBLIC
                          "${PROJECT_BINARY_DIR}"
                          "${PROJECT_SOURCE_DIR}/birdhub/video"
                          "${PROJECT_SOURCE_DIR}/birdhub/events"
                          "${PROJECT_SOURCE_DIR}/birdhub/detection"
+                        "${PROJECT_SOURCE_DIR}/birdhub/orchestration"
                          ${OpenCV_INCLUDE_DIRS}
                          )
 target_link_libraries(all_tests PRIVATE doctest::doctest ${OpenCV_LIBS})
-target_link_libraries(all_tests PUBLIC Events Video Detection)
+target_link_libraries(all_tests PUBLIC Events Video Detection Orchestration test_utils)

@@ -1,13 +1,18 @@
 #include "orchestration.hpp"
 
+
 void VideoEventManager::add_subscriber(std::shared_ptr<Subscriber> subscriber) {
     // add subscriber to the  vector of subscribers
     this->subscribers.push_back(subscriber);
     // set the event queue for the subscriber
-    subscriber->set_event_queue(&this->event_queue);
+    subscriber->set_event_queue(this->event_queue);
 }
 
 void VideoEventManager::run() {
+    // register the frame queue with the stream
+    this->stream.register_frame_queue(this->frame_queue);
+    // start the stream
+    this->stream.start();
     // call the start method for all subscribers
     for (auto &subscriber : this->subscribers) {
         subscriber->start();
@@ -15,8 +20,8 @@ void VideoEventManager::run() {
     // run the event manager
     while (true) {
         // check frame queue
-        if (!this->frame_queue.empty()) {
-            FrameEvent frame_event = this->frame_queue.front();
+        if (!this->frame_queue->empty()) {
+            FrameEvent frame_event = this->frame_queue->front();
             for (auto &subscriber : this->subscribers) {
                 // check if subscriber is listening to the frame event
                 if (subscriber->listening_to().find(EventType::NEW_FRAME) != subscriber->listening_to().end()) {
@@ -24,14 +29,14 @@ void VideoEventManager::run() {
                 }
             }
             // remove the frame token from the queue
-            this->frame_queue.pop();
+            this->frame_queue->pop();
         }
         // check if event queue is empty
-        if (this->event_queue.empty()) {
+        if (this->event_queue->empty()) {
             continue;
         }
         // get the event from the queue
-        Event event = this->event_queue.front();
+        Event event = this->event_queue->front();
         // notify all subscribers
         for (auto &subscriber : this->subscribers) {
             // check if subscriber is listening to the event type
@@ -41,6 +46,22 @@ void VideoEventManager::run() {
             }
         }
         // remove the event from the queue
-        this->event_queue.pop();
+        this->event_queue->pop();
+    }
+}
+
+VideoEventManager::VideoEventManager(Stream &stream) : stream(stream) {
+    // create event queue
+    this->event_queue = std::make_shared<std::queue<Event>>();
+    // create frame queue
+    this->frame_queue = std::make_shared<std::queue<FrameEvent>>();
+}
+
+VideoEventManager::~VideoEventManager() {
+    // stop the stream
+    this->stream.stop();
+    // stop all subscribers
+    for (auto &subscriber : this->subscribers) {
+        subscriber->stop();
     }
 }

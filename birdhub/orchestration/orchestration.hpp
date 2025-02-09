@@ -5,6 +5,7 @@
 #include <map>
 #include <queue>
 #include <optional>
+#include <memory>
 
 #ifndef BIRDHUB_ORCHESTRATION_HPP
 #define BIRDHUB_ORCHESTRATION_HPP
@@ -12,9 +13,8 @@
 class Mediator {
 public:
     virtual ~Mediator() = default;
-
     virtual void add_subscriber(std::shared_ptr<Subscriber> subscriber) = 0;
-    virtual void run();
+    virtual void run() = 0;
 };
 
 class VideoEventManager : public Mediator {
@@ -28,9 +28,8 @@ public:
 private:
     Stream &stream;
     std::vector<std::shared_ptr<Subscriber>> subscribers;
-    std::queue<Event> event_queue;
-    std::queue<FrameEvent> frame_queue;
-    void notify();
+    std::shared_ptr<std::queue<Event>> event_queue;
+    std::shared_ptr<std::queue<FrameEvent>> frame_queue;
 };
 
 #endif

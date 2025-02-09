@@ -4,48 +4,8 @@
 #include <ctime> 
 #include <vector>
 #include <opencv2/opencv.hpp>
+#include "test_utils.hpp"
 
-cv::Mat create_random_image(int rows, int cols) {
-    cv::Mat img(rows, cols, CV_64FC1);
-    double low = -500.0;
-    double high = +500.0;
-    cv::randu(img, cv::Scalar(low), cv::Scalar(high));
-    return img;
-}
-
-
-// mock camera capture class that returns random images and inherits from CameraCapture
-
-
-class MockCameraCapture : public CameraCapture {
-public:
-    MockCameraCapture(const char* device, int width, int height, uint32_t pixel_format) {}
-    cv::Mat getNextFrame() override {
-        if (frames.empty()) {
-            // Return random image if no frames are set
-            return create_random_image(3, 3);
-        }
-        if (frame_index >= frames.size()) {
-            return cv::Mat();
-        }
-        cv::Mat frame = frames.at(frame_index);
-        frame_index++;
-        return frame;
-    }
-    void startStreaming() override {}
-    void stopStreaming() override {}
-    void setMockFrames(std::vector<cv::Mat> frames) {
-        this->frames = frames;
-        this->frame_index = 0;
-    }
-private:
-    std::vector<cv::Mat> frames;
-    int frame_index;
-};
-
-time_t get_random_time() {
-    return rand();
-}
 
 // Test Imagestore throws exception when size is negative
 
