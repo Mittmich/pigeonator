@@ -1,4 +1,5 @@
 #include "orchestration.hpp"
+#include <iostream>
 
 
 void VideoEventManager::add_subscriber(std::shared_ptr<Subscriber> subscriber) {
@@ -17,8 +18,14 @@ void VideoEventManager::run() {
     for (auto &subscriber : this->subscribers) {
         subscriber->start();
     }
+    // set running flag to true
+    this->running = true;
     // run the event manager
     while (true) {
+        // check whether eveng manager should continue to run
+        if (!this->running) {
+            break;
+        }
         // check frame queue
         if (!this->frame_queue->empty()) {
             FrameEvent frame_event = this->frame_queue->front();
@@ -50,6 +57,17 @@ void VideoEventManager::run() {
     }
 }
 
+void VideoEventManager::stop() {
+    // stop the stream
+    this->stream.stop();
+    // stop all subscribers
+    for (auto &subscriber : this->subscribers) {
+        subscriber->stop();
+    }
+    // set running flag to false
+    this->running = false;
+}
+
 VideoEventManager::VideoEventManager(Stream &stream) : stream(stream) {
     // create event queue
     this->event_queue = std::make_shared<std::queue<Event>>();
@@ -58,10 +76,6 @@ VideoEventManager::VideoEventManager(Stream &stream) : stream(stream) {
 }
 
 VideoEventManager::~VideoEventManager() {
-    // stop the stream
-    this->stream.stop();
-    // stop all subscribers
-    for (auto &subscriber : this->subscribers) {
-        subscriber->stop();
-    }
+    // stop the event manager
+    this->stop();
 }

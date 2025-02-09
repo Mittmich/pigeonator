@@ -1,4 +1,5 @@
 #include "test_utils.hpp"
+#include <iostream>
 
 cv::Mat create_random_image(int rows, int cols) {
     cv::Mat img(rows, cols, CV_64FC1);
@@ -37,6 +38,14 @@ void MockStream::simulate_frame(const FrameEvent& frame) {
         }
     };
 
+bool MockStream::is_running() {
+        return running;
+    };
+
+bool MockStream::has_queue() {
+        return queue_registered;
+    };
+
 // MockSubscriber class
 
 void MockSubscriber::set_event_queue(std::shared_ptr<std::queue<Event>> queue) {
@@ -53,6 +62,12 @@ void MockSubscriber::stop() {
 
 void MockSubscriber::notify(Event event) {
         received_events.push_back(event);
+    };
+
+void MockSubscriber::simulate_event(Event event) {
+        if (event_queue) {
+            event_queue->push(event);
+        }
     };
 
 std::set<EventType> MockSubscriber::listening_to() {

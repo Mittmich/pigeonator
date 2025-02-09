@@ -34,7 +34,6 @@ class MockSubscriber : public Subscriber {
 public:
     std::set<EventType> event_types;
     std::vector<Event> received_events;
-    std::vector<FrameEvent> received_frames;
     bool is_running = false;
     void set_event_queue(std::shared_ptr<std::queue<Event>> queue) override;
     void start() override;
@@ -42,6 +41,7 @@ public:
     void notify(Event event) override;
     std::set<EventType> listening_to() override;
     std::shared_ptr<std::queue<Event>> event_queue;
+    void simulate_event(Event event);
 };
 
 

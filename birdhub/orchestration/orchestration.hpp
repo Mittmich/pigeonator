@@ -15,6 +15,7 @@ public:
     virtual ~Mediator() = default;
     virtual void add_subscriber(std::shared_ptr<Subscriber> subscriber) = 0;
     virtual void run() = 0;
+    virtual void stop() = 0;
 };
 
 class VideoEventManager : public Mediator {
@@ -25,11 +26,13 @@ public:
     ~VideoEventManager();
     void add_subscriber(std::shared_ptr<Subscriber> subscriber) override;
     void run() override;
+    void stop() override;
 private:
     Stream &stream;
     std::vector<std::shared_ptr<Subscriber>> subscribers;
     std::shared_ptr<std::queue<Event>> event_queue;
     std::shared_ptr<std::queue<FrameEvent>> frame_queue;
+    bool running = false;
 };
 
 #endif
