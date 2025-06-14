@@ -5,6 +5,14 @@
 #include <vector>
 #include <opencv2/opencv.hpp>
 #include "test_utils.hpp"
+#include <unistd.h>
+
+#ifdef __linux__
+#include <linux/videodev2.h>
+#else
+// Mock V4L2 constants for non-Linux platforms
+#define V4L2_PIX_FMT_YUYV 0x56595559
+#endif
 
 
 // Test Imagestore throws exception when size is negative

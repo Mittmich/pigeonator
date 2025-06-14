@@ -11,16 +11,18 @@
 #include <string>
 #include <map>
 #include <opencv2/opencv.hpp>
+#include <vector>
+#include <thread>
+#include "events.hpp"
+#include "mm.hpp"
+
+#ifdef __linux__
 #include <linux/videodev2.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
-#include <linux/videodev2.h>
-#include <vector>
-#include <thread>
-#include "events.hpp"
-#include "mm.hpp"
+#endif
 
 class CameraCapture {
 public:
@@ -33,9 +35,8 @@ public:
     virtual cv::Mat getNextFrame()= 0;
 };
 
-
+#ifdef __linux__
 // V4l2CameraCapture class
-
 class V4l2CameraCapture : public CameraCapture {
 public:
     V4l2CameraCapture(const char* device, int width, int height, uint32_t pixel_format, bool non_blocking);
@@ -56,6 +57,22 @@ private:
     bool openDevice();
     bool initDevice();
     void cleanup();
+};
+#endif
+
+// Cross-platform OpenCV-based camera capture
+class OpenCVCameraCapture : public CameraCapture {
+public:
+    OpenCVCameraCapture(int camera_id = 0);
+    ~OpenCVCameraCapture();
+    void startStreaming() override;
+    void stopStreaming() override;
+    cv::Mat getNextFrame() override;
+
+private:
+    cv::VideoCapture cap;
+    int camera_id_;
+    bool started = false;
 };
 
 

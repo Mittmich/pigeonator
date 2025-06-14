@@ -1,14 +1,18 @@
-#include <video.cpp>
-#include "orchestration.hpp"
-#include "detection.hpp"
-#include "mm.hpp"
+#include "video/video.hpp"
+#include "orchestration/orchestration.hpp"
+#include "detection/detection.hpp"
+#include "memory_management/mm.hpp"
 #include <iostream>
 #include <vector>
 #include <opencv2/opencv.hpp>
 
 int main() {
     // Create the camera capture object with the desired settings
+#ifdef __linux__
     V4l2CameraCapture camera("/dev/video0", 640, 480, V4L2_PIX_FMT_MJPEG);
+#else
+    OpenCVCameraCapture camera(0); // Use default camera
+#endif
     // instantiate image store
     auto image_store = std::make_shared<ImageStore>(1000);
     auto stream = Stream(image_store, &camera);

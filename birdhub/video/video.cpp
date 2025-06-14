@@ -4,6 +4,7 @@
 
 #include "video.hpp"
 
+#ifdef __linux__
 V4l2CameraCapture::V4l2CameraCapture(const char* device, int width, int height, uint32_t pixel_format, bool non_blocking = false)
     : device_(device), width_(width), height_(height), pixel_format_(pixel_format), fd_(-1), non_blocking_(non_blocking) {}
 
@@ -159,7 +160,45 @@ void V4l2CameraCapture::cleanup() {
     if (fd_ != -1) {
         close(fd_);
     }
+}
+#endif // __linux__
+
+// Cross-platform OpenCV-based camera capture implementation
+OpenCVCameraCapture::OpenCVCameraCapture(int camera_id) : camera_id_(camera_id) {}
+
+OpenCVCameraCapture::~OpenCVCameraCapture() {
+    stopStreaming();
+}
+
+void OpenCVCameraCapture::startStreaming() {
+    if (!cap.isOpened()) {
+        cap.open(camera_id_);
+        if (!cap.isOpened()) {
+            throw std::runtime_error("Failed to open camera");
+        }
     }
+    started = true;
+}
+
+void OpenCVCameraCapture::stopStreaming() {
+    if (cap.isOpened()) {
+        cap.release();
+    }
+    started = false;
+}
+
+cv::Mat OpenCVCameraCapture::getNextFrame() {
+    if (!started) {
+        throw std::runtime_error("Camera not started");
+    }
+    
+    cv::Mat frame;
+    if (!cap.read(frame)) {
+        return cv::Mat(); // Return empty frame if capture fails
+    }
+    
+    return frame;
+}
 
 
 Stream::Stream(std::shared_ptr<ImageStore> image_store, CameraCapture *cam_capture, bool write_timestamps)
