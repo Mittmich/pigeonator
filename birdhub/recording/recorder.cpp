@@ -227,23 +227,41 @@ std::vector<FrameEvent> EventRecorder::create_detection_frames(DetectionEvent de
 
 FrameEvent EventRecorder::create_detection_frame(DetectionEvent detection_event, time_t frame_timestamp) {
     // Retrive the image from the image store
-    if (!image_store->get(frame_timestamp).has_value()) {
-        throw std::runtime_error("No image available for the timestamp in detection frame creation.");
-    }
-    cv::Mat frame = image_store->get(frame_timestamp).value();
-    // Search for the detection in the detection event that matches the frame timestamp
-    auto detections = detection_event.get_detections();
-    for (auto& detection : detections) { // Changed to use a reference for detection
-        if (detection.get_frame_event().get_timestamp() == frame_timestamp) {
-            // Draw bounding boxes on the frame if available
-            auto bounding_boxes_opt = detection.get_bounding_boxes(); // Store the optional
-            if (bounding_boxes_opt.has_value()) {
-                std::vector<cv::Rect> bounding_boxes_vec_copy = bounding_boxes_opt.value(); // Explicit copy of the vector
-                for (const auto& box : bounding_boxes_vec_copy) { // Iterate over the copied vector
-                    cv::rectangle(frame, box, cv::Scalar(0, 255, 0), 2);
+    if (image_store->get(frame_timestamp).has_value()) {
+        cv::Mat frame = image_store->get(frame_timestamp).value();
+        // Search for the detection in the detection event that matches the frame timestamp
+        auto detections = detection_event.get_detections();
+        for (auto& detection : detections) { // Changed to use a reference for detection
+            if (detection.get_frame_event().get_timestamp() == frame_timestamp) {
+                // Draw bounding boxes on the frame if available
+                auto bounding_boxes_opt = detection.get_bounding_boxes();
+                auto labels_opt = detection.get_labels(); // Assuming this method exists to get labels
+
+                if (bounding_boxes_opt.has_value()) {
+                    const auto& boxes_vec = bounding_boxes_opt.value();
+                    std::vector<std::string> labels_vec;
+                    if (labels_opt.has_value()) {
+                        labels_vec = labels_opt.value();
+                    }
+
+                    for (size_t i = 0; i < boxes_vec.size(); ++i) {
+                        const auto& box = boxes_vec[i];
+                        // Draw the bounding box with red lines (BGR format), thickness 5
+                        cv::rectangle(frame, box, cv::Scalar(0, 0, 255), 5);
+
+                        if (i < labels_vec.size() && !labels_vec[i].empty()) {
+                            const std::string& label_text = labels_vec[i];
+                            // Position text near the top-left of the box, or adjust as needed
+                            // Python: (x1, y2 + 15) -> (box.tl().x, box.br().y + 15)
+                            cv::Point text_origin(box.tl().x, box.br().y + 15);
+                            cv::putText(frame, label_text, text_origin, cv::FONT_HERSHEY_SIMPLEX, 1.0, cv::Scalar(255, 255, 255), 1); // White text, thickness 1
+                        }
+                    }
                 }
             }
         }
+        // Put the modified image back to the store so _write_detections uses it
+        image_store->put(frame_timestamp, frame);
     }
     return FrameEvent(
         frame_timestamp,
@@ -323,6 +341,9 @@ void EventRecorder::handle_new_frame(Event event) {
         this->video_writer.write(frame);
         this->_stop_recording_in--;
     } else if (this->video_writer.isOpened()) {
+        // call update detections with empty detection event
+        DetectionEvent empty_detection_event(frame_event.get_timestamp(), {}, std::nullopt);
+        this->_update_detections(empty_detection_event);
         this->_write_detections();
         this->_clear_buffers();
         this->_close_video_writers();
@@ -338,6 +359,8 @@ void EventRecorder::handle_detection(Event event) {
     if (this->recording){
         this->_stop_recording_in = this->slack;
         this->_update_detections(detection_event);
+        // clear look back frames buffer
+        video_buffer.clear();
     } else {
         // Start recording if not already recording
         this->recording = true;
