@@ -15,12 +15,14 @@ find_package(OpenCV REQUIRED)
 add_subdirectory(birdhub/video)
 add_subdirectory(birdhub/events)
 add_subdirectory(birdhub/orchestration)
+add_subdirectory(birdhub/recording)
 add_subdirectory(birdhub/detection)
 add_subdirectory(birdhub/memory_management)
 
 # app
 
 add_executable(pgn birdhub/birdhub.cpp)
+add_executable(example birdhub/example.cpp)
 #target_include_directories(pgn PUBLIC ${LIBCAMERA_INCLUDE_DIRS})
 target_include_directories(pgn PRIVATE 
         "${PROJECT_BINARY_DIR}"
@@ -28,10 +30,11 @@ target_include_directories(pgn PRIVATE
         "${PROJECT_SOURCE_DIR}/birdhub/orchestration"
         "${PROJECT_SOURCE_DIR}/birdhub/events"
         "${PROJECT_SOURCE_DIR}/birdhub/detection"
+        "${PROJECT_SOURCE_DIR}/birdhub/recording"
         "${PROJECT_SOURCE_DIR}/birdhub/memory_management"
         ${OpenCV_INCLUDE_DIRS} )
-target_link_libraries(pgn PRIVATE ${LIBCAMERA_LIBRARIES} ${OpenCV_LIBS} Video Events Orchestration Detection MemoryManagement)
-
+target_link_libraries(pgn PRIVATE ${LIBCAMERA_LIBRARIES} ${OpenCV_LIBS} Video Events Orchestration Detection Recorder MemoryManagement)
+target_link_libraries(example PRIVATE ${LIBCAMERA_LIBRARIES} ${OpenCV_LIBS} Video Events Orchestration Detection Recorder MemoryManagement)
 # tests
 
 add_subdirectory(tests/)

@@ -19,3 +19,4 @@ env/*
 birdhub-python/*
 tests-python/*
 vcpkg_installed/*
+.DS_Store
