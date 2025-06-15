@@ -227,7 +227,9 @@ void Stream::stop() {
     // set running flag to false to stop the thread
     this->running = false;
     // join the thread
-    this->queue_thread.join();
+    if (this->queue_thread.joinable()){
+        this->queue_thread.join();
+    }
 }
 
 void Stream::_start() {

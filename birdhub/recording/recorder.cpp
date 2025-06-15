@@ -66,7 +66,9 @@ void Recorder::stop() {
     // set running flag to false to stop the thread
     this->running = false;
     // join the thread
-    this->recording_thread.join();
+    if (this->recording_thread.joinable()){
+        this->recording_thread.join();
+    }
     // release video writer
     if (video_writer.isOpened()) {
         video_writer.release();
