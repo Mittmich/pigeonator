@@ -85,7 +85,8 @@ protected:
     void _clear_buffers();
     void _close_video_writers();
     void _update_detections(DetectionEvent detection_event);
-    void _create_detection_frames(DetectionEvent detection_event);
+    std::vector<FrameEvent> create_detection_frames(DetectionEvent detection_event);
+    FrameEvent create_detection_frame(DetectionEvent detection_event, time_t frame_timestamp);
     // Additional parameters for event recording
     int slack; // Number of frames wait until stop recording
     int fps; // frames per second for the video
@@ -97,7 +98,7 @@ protected:
     cv::VideoWriter video_writer;
     cv::VideoWriter detection_writer;
     // Buffer for detection events
-    std::deque<DetectionEvent> detection_buffer;
+    std::deque<FrameEvent> detection_buffer;
     // Buffer for effector actions
     std::deque<Event> effector_buffer;
     // Buffer for video frames

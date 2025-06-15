@@ -207,13 +207,60 @@ void EventRecorder::_close_video_writers() {
     }
 }
 
+std::vector<FrameEvent> EventRecorder::create_detection_frames(DetectionEvent detection_event) {
+    std::vector<FrameEvent> detection_frames;
+    if (this->recording) {
+        for (const auto& timestamp : detection_video_buffer) {
+            // Create a detection frame for each timestamp in the detection video buffer
+            FrameEvent detection_frame = this->create_detection_frame(detection_event, timestamp);
+            detection_frames.push_back(detection_frame);
+        }
+    } else {
+        for (const auto& timestamp : video_buffer) {
+            // Create a detection frame for each timestamp in the video buffer
+            FrameEvent detection_frame = this->create_detection_frame(detection_event, timestamp);
+            detection_frames.push_back(detection_frame);
+        }
+    }
+    return detection_frames;
+}
+
+FrameEvent EventRecorder::create_detection_frame(DetectionEvent detection_event, time_t frame_timestamp) {
+    // Retrive the image from the image store
+    if (!image_store->get(frame_timestamp).has_value()) {
+        throw std::runtime_error("No image available for the timestamp in detection frame creation.");
+    }
+    cv::Mat frame = image_store->get(frame_timestamp).value();
+    // Search for the detection in the detection event that matches the frame timestamp
+    for (auto& detection : detection_event.get_detections()) {
+        if (detection.get_frame_event().get_timestamp() == frame_timestamp) {
+            // Draw bounding boxes on the frame if available
+            if (detection.get_bounding_boxes().has_value()) {
+                for (const auto& box : detection.get_bounding_boxes().value()) {
+                    cv::rectangle(frame, box, cv::Scalar(0, 255, 0), 2);
+                }
+            }
+        }
+    }
+    return FrameEvent(
+        frame_timestamp,
+        std::make_optional<std::map<std::string, std::string>>({
+            {"type", "detection_frame"},
+            {"detection_count", std::to_string(detection_event.get_detections().size())}
+        })
+    );
+}
+
+
+void EventRecorder::_write_detections() {
+
+}
 
 void EventRecorder::_update_detections(DetectionEvent detection_event) {
-    // Add the detection event to the detection buffer
-    detection_buffer.push_back(detection_event);
-    // If we have more detections than detection_buffer_size, remove the oldest one
-    if (detection_buffer.size() > detection_buffer_size) {
-        detection_buffer.pop_front();
+    std::vector<FrameEvent> detection_frames = this->create_detection_frames(detection_event);
+    // Add the detection frames to the detection buffer
+    for (const auto& detection : detection_frames) {
+        this->detection_buffer.push_back(detection);
     }
 }
 
