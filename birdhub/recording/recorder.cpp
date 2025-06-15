@@ -5,8 +5,11 @@
 
 Recorder::Recorder(
     std::set<EventType> listening_events,
-    std::shared_ptr<ImageStore> image_store
-) : listening_events(listening_events), image_store(image_store){
+    std::shared_ptr<ImageStore> image_store,
+    const std::string& output_directory
+) : listening_events(listening_events), image_store(image_store), output_directory(output_directory) {
+    // Create output directory if it doesn't exist
+    std::filesystem::create_directories(output_directory);
 };
 
 Recorder::~Recorder() {
@@ -46,9 +49,10 @@ void Recorder::start() {
     this->running = true;
     // open video writer if not already opened
     if (!video_writer.isOpened()) {
-        // create a video writer with a fixed filename and codec
-        std::string filename = "recording_" + std::to_string(std::time(nullptr)) + ".avi";
-        video_writer.open(filename, cv::VideoWriter::fourcc('m', 'p', '4', 'v'), this->fps, this->frame_size, true);
+        // create a video writer with a filename in the specified directory
+        std::string filename = "recording_" + std::to_string(std::time(nullptr)) + ".mp4";
+        std::filesystem::path full_path = std::filesystem::path(output_directory) / filename;
+        video_writer.open(full_path.string(), cv::VideoWriter::fourcc('m', 'p', '4', 'v'), this->fps, this->frame_size, true);
         if (!video_writer.isOpened()) {
             throw std::runtime_error("Could not open video writer.");
         }
@@ -113,8 +117,9 @@ void Recorder::poll_read_queue() {
 // ContinuousRecorder class implementation
 ContinuousRecorder::ContinuousRecorder(
     std::set<EventType> listening_events,
-    std::shared_ptr<ImageStore> image_store
-) : Recorder(listening_events, image_store) {
+    std::shared_ptr<ImageStore> image_store,
+    const std::string& output_directory
+) : Recorder(listening_events, image_store, output_directory) {
 }
 ContinuousRecorder::~ContinuousRecorder() {
     if (running) {

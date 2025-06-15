@@ -6,6 +6,7 @@
 #include <deque>
 #include <map>
 #include <mutex>
+#include <filesystem>
 #include "mm.hpp"
 #include <chrono>
 
@@ -16,7 +17,8 @@ class Recorder : public Subscriber {
 public:
     Recorder(
         std::set<EventType> listening_events,
-        std::shared_ptr<ImageStore> image_store
+        std::shared_ptr<ImageStore> image_store,
+        const std::string& output_directory = "."
     );
     ~Recorder();
     std::set<EventType> listening_to() override;
@@ -29,6 +31,7 @@ protected:
     // add video frame size
     cv::Size frame_size = cv::Size(1080, 1920); // default size
     int fps = 30;
+    std::string output_directory;
     std::shared_ptr<ImageStore> image_store;
     std::shared_ptr<std::queue<Event>> event_queue;
     std::thread recording_thread;
@@ -51,7 +54,8 @@ class ContinuousRecorder : public Recorder {
 public:
     ContinuousRecorder(
         std::set<EventType> listening_events,
-        std::shared_ptr<ImageStore> image_store
+        std::shared_ptr<ImageStore> image_store,
+        const std::string& output_directory = "."
     );
     ~ContinuousRecorder();
 protected:
