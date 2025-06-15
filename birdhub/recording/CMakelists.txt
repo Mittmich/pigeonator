@@ -21,6 +21,10 @@ target_include_directories(Recorder
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/../memory_management
 )
+target_include_directories(Recorder
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/../detection
+)
 target_link_libraries(Recorder
     PUBLIC
         MemoryManagement
