@@ -2,6 +2,7 @@
 #include "orchestration/orchestration.hpp"
 #include "detection/detection.hpp"
 #include "memory_management/mm.hpp"
+#include "recording/recorder.hpp"
 #include <iostream>
 #include <vector>
 #include <opencv2/opencv.hpp>
@@ -26,9 +27,16 @@ int main() {
         0,
         std::chrono::seconds(5)
     );
+    // instnatice continuous recorder
+    auto recorder = std::make_shared<ContinuousRecorder>(
+        std::set<EventType>({EventType::NEW_FRAME}),
+        image_store,
+        "recordings"
+    );
     // instantiate event manager
     auto manager = VideoEventManager(stream);
     manager.add_subscriber(motion_detector);
+    manager.add_subscriber(recorder);
     // start the event manager
     manager.run();
     return 0;

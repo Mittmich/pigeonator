@@ -29,7 +29,7 @@ public:
 protected:
     std::set<EventType> listening_events;
     // add video frame size
-    cv::Size frame_size = cv::Size(1080, 1920); // default size
+    cv::Size frame_size = cv::Size(1920, 1080); // default size
     int fps = 30;
     std::string output_directory;
     std::shared_ptr<ImageStore> image_store;

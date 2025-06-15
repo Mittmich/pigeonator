@@ -1,6 +1,7 @@
 #include "recorder.hpp"
 #include <string>
 #include <optional>
+#include <iostream>
 
 
 Recorder::Recorder(
@@ -137,10 +138,13 @@ void ContinuousRecorder::handle_new_frame(Event event) {
     // In a production system, you might want to use dynamic_cast for safety
     FrameEvent& frame_event = static_cast<FrameEvent&>(event);
     
+    // log that we got here
+    std::cout << "Handling new frame event at timestamp: " << frame_event.get_timestamp() << std::endl;
     // Check if the image exists in the image store
     if (!image_store->get(frame_event.get_timestamp()).has_value()) {
         return; // No image available for this timestamp
     }
+    std::cout << "Image found for timestamp: " << frame_event.get_timestamp() << std::endl;
     cv::Mat frame = image_store->get(frame_event.get_timestamp()).value();
     // Write the frame to the video file
     video_writer.write(frame);
