@@ -64,7 +64,48 @@ protected:
     void handle_effector_action(Event event) override;
 };
 
-
+class EventRecorder : public Recorder {
+public:
+    EventRecorder(
+        std::set<EventType> listening_events,
+        std::shared_ptr<ImageStore> image_store,
+        const std::string& output_directory = ".",
+        int slack = 100,
+        int fps = 30,
+        int look_back_frames = 3,
+        int detection_buffer_size = 200
+    );
+    ~EventRecorder();
+protected:
+    void handle_new_frame(Event event) override;
+    void handle_detection(Event event) override;
+    void handle_effector_action(Event event) override;
+    void _update_buffers(FrameEvent frame_event);
+    void _write_detections();
+    void _clear_buffers();
+    void _close_video_writers();
+    void _update_detections(DetectionEvent detection_event);
+    void _create_detection_frames(DetectionEvent detection_event);
+    // Additional parameters for event recording
+    int slack; // Number of frames wait until stop recording
+    int fps; // frames per second for the video
+    int look_back_frames; // number of frames to look back for event recording
+    int detection_buffer_size; // number of frames to buffer for detection events
+    int _stop_recording_in = 0;
+    bool recording = false; // Flag to indicate if recording is in progress
+    // Video writer for recording
+    cv::VideoWriter video_writer;
+    cv::VideoWriter detection_writer;
+    // Buffer for detection events
+    std::deque<DetectionEvent> detection_buffer;
+    // Buffer for effector actions
+    std::deque<Event> effector_buffer;
+    // Buffer for video frames
+    std::deque<time_t> video_buffer;
+    std::deque<time_t> detection_video_buffer;;
+    // recording start time
+    std::chrono::time_point<std::chrono::steady_clock> recording_start_time;
+};
 
 
 #endif

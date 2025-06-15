@@ -153,4 +153,127 @@ void ContinuousRecorder::handle_detection(Event event) {
 }
 void ContinuousRecorder::handle_effector_action(Event event) {
     // For continuous recording, we ignore effector action events
+};
+
+// EventRecorder class implementation
+
+EventRecorder::EventRecorder(
+    std::set<EventType> listening_events,
+    std::shared_ptr<ImageStore> image_store,
+    const std::string& output_directory,
+    int slack,
+    int fps,
+    int look_back_frames,
+    int detection_buffer_size
+) : Recorder(listening_events, image_store, output_directory), slack(slack), fps(fps) {
+};
+
+EventRecorder::~EventRecorder() {
+    if (running) {
+        stop();
+    }
+};
+
+void EventRecorder::_update_buffers(FrameEvent frame_event) {
+    // Add the frame event to the video buffer
+    video_buffer.push_back(frame_event.get_timestamp());
+    // Add the frame event to the detection buffer if it is a detection event
+    detection_video_buffer.push_back(frame_event.get_timestamp());
+    // If we have more frames than look_back_frames, remove the oldest one
+    if (video_buffer.size() > look_back_frames) {
+        video_buffer.pop_front();
+    }
+    // Same for detection video buffer
+    if (detection_video_buffer.size() > this->slack) {
+        detection_video_buffer.pop_front();
+    }
+}
+
+void EventRecorder::_clear_buffers() {
+    // Clear all buffers
+    video_buffer.clear();
+    detection_video_buffer.clear();
+    detection_buffer.clear();
+    effector_buffer.clear();
+}
+
+void EventRecorder::_close_video_writers() {
+    // Close the video writer if it is opened
+    if (video_writer.isOpened()) {
+        video_writer.release();
+    }
+    if (detection_writer.isOpened()) {
+        detection_writer.release();
+    }
+}
+
+
+void EventRecorder::_update_detections(DetectionEvent detection_event) {
+    // Add the detection event to the detection buffer
+    detection_buffer.push_back(detection_event);
+    // If we have more detections than detection_buffer_size, remove the oldest one
+    if (detection_buffer.size() > detection_buffer_size) {
+        detection_buffer.pop_front();
+    }
+}
+
+void EventRecorder::handle_new_frame(Event event) {
+    if (event.type != EventType::NEW_FRAME) {
+        return;
+    }
+    FrameEvent& frame_event = static_cast<FrameEvent&>(event);
+    // Check if the image exists in the image store
+    if (!image_store->get(frame_event.get_timestamp()).has_value()) {
+        return; // No image available for this timestamp
+    }
+    cv::Mat frame = image_store->get(frame_event.get_timestamp()).value();
+    this->_update_buffers(frame_event);
+    // Check  whether we should write detections to video
+    if (this->detection_buffer.size() > this->detection_buffer_size) {
+        this->_write_detections();
+    }
+    if (this->_stop_recording_in > 0) {
+        this->video_writer.write(frame);
+        this->_stop_recording_in--;
+    } else if (this->video_writer.isOpened()) {
+        this->_write_detections();
+        this->_clear_buffers();
+        this->_close_video_writers();
+        this->recording = false;
+    }
+};
+
+void EventRecorder::handle_detection(Event event) {
+    if (event.type != EventType::DETECTION) {
+        return;
+    }
+    DetectionEvent& detection_event = static_cast<DetectionEvent&>(event);
+    if (this->recording){
+        this->_stop_recording_in = this->slack;
+        this->_update_detections(detection_event);
+    } else {
+        // Start recording if not already recording
+        this->recording = true;
+        this->_stop_recording_in = this->slack;
+        this->recording_start_time = std::chrono::steady_clock::now();
+        // Create a video writer if not already created
+        if (!video_writer.isOpened()) {
+            std::string filename = "recording_" + std::to_string(std::time(nullptr)) + ".mp4";
+            std::filesystem::path full_path = std::filesystem::path(output_directory) / filename;
+            video_writer.open(full_path.string(), cv::VideoWriter::fourcc('m', 'p', '4', 'v'), this->fps, this->frame_size, true);
+            if (!video_writer.isOpened()) {
+                throw std::runtime_error("Could not open video writer.");
+            }
+        }
+        // Write look back frames to the video writer
+        for (const auto& timestamp : video_buffer) {
+            if (image_store->get(timestamp).has_value()) {
+                cv::Mat frame = image_store->get(timestamp).value();
+                video_writer.write(frame);
+            }
+        }
+        // clear look back frames buffer
+        video_buffer.clear();
+        this->_update_detections(detection_event);
+    }
 }
