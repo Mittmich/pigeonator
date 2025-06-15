@@ -5,6 +5,8 @@
 #include "mm.hpp"
 #include <chrono>
 
+#pragma once
+
 // add detector base class, inheriting from Subscriber
 
 class Detector : public Subscriber {
