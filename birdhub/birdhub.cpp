@@ -8,6 +8,9 @@
 #include <opencv2/opencv.hpp>
 
 int main() {
+    // Setup signal handlers for graceful shutdown
+    VideoEventManager::setup_signal_handlers();
+
     // Create the camera capture object with the desired settings
 #ifdef __linux__
     V4l2CameraCapture camera("/dev/video0", 640, 480, V4L2_PIX_FMT_MJPEG);
@@ -39,5 +42,6 @@ int main() {
     manager.add_subscriber(recorder);
     // start the event manager
     manager.run();
+    std::cout << "VideoEventManager stopped gracefully." << std::endl;
     return 0;
 }

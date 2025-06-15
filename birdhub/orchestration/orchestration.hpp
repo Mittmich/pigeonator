@@ -1,4 +1,3 @@
-
 #include "video.hpp"
 #include "events.hpp"
 #include <set>
@@ -6,9 +5,14 @@
 #include <queue>
 #include <optional>
 #include <memory>
+#include <signal.h>
+#include <atomic>
 
 #ifndef BIRDHUB_ORCHESTRATION_HPP
 #define BIRDHUB_ORCHESTRATION_HPP
+
+// Global signal flag for graceful shutdown
+extern std::atomic<bool> g_shutdown_requested;
 
 class Mediator {
 public:
@@ -27,6 +31,11 @@ public:
     void add_subscriber(std::shared_ptr<Subscriber> subscriber) override;
     void run() override;
     void stop() override;
+    
+    // Signal handling
+    static void setup_signal_handlers();
+    static void signal_handler(int signal);
+    
 private:
     Stream &stream;
     std::vector<std::shared_ptr<Subscriber>> subscribers;

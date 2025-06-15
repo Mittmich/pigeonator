@@ -1,5 +1,11 @@
 #include "orchestration.hpp"
 #include <iostream>
+#include <signal.h>
+#include <atomic>
+
+
+// Global signal flag for graceful shutdown
+std::atomic<bool> g_shutdown_requested{false};
 
 
 void VideoEventManager::add_subscriber(std::shared_ptr<Subscriber> subscriber) {
@@ -22,8 +28,8 @@ void VideoEventManager::run() {
     this->running = true;
     // run the event manager
     while (true) {
-        // check whether eveng manager should continue to run
-        if (!this->running) {
+        // check whether event manager should continue to run
+        if (!this->running || g_shutdown_requested) {
             break;
         }
         // check frame queue
@@ -55,6 +61,11 @@ void VideoEventManager::run() {
         // remove the event from the queue
         this->event_queue->pop();
     }
+    
+    // If shutdown was requested by signal, call stop to clean up properly
+    if (g_shutdown_requested) {
+        this->stop();
+    }
 }
 
 void VideoEventManager::stop() {
@@ -78,4 +89,21 @@ VideoEventManager::VideoEventManager(Stream &stream) : stream(stream) {
 VideoEventManager::~VideoEventManager() {
     // stop the event manager
     this->stop();
+}
+
+// Signal handling methods
+void VideoEventManager::setup_signal_handlers() {
+    struct sigaction sa;
+    sa.sa_handler = VideoEventManager::signal_handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    
+    // Register handler for SIGTERM and SIGINT
+    sigaction(SIGTERM, &sa, nullptr);
+    sigaction(SIGINT, &sa, nullptr);
+}
+
+void VideoEventManager::signal_handler(int signal) {
+    std::cout << "\nReceived signal " << signal << ", initiating graceful shutdown..." << std::endl;
+    g_shutdown_requested = true;
 }
