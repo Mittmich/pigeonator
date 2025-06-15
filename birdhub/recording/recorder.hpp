@@ -87,6 +87,7 @@ protected:
     void _update_detections(DetectionEvent detection_event);
     std::vector<FrameEvent> create_detection_frames(DetectionEvent detection_event);
     FrameEvent create_detection_frame(DetectionEvent detection_event, time_t frame_timestamp);
+    void _add_activation_overlay(FrameEvent& detection_frame, Event& activation, const std::vector<time_t>& write_timestamps);
     // Additional parameters for event recording
     int slack; // Number of frames wait until stop recording
     int fps; // frames per second for the video

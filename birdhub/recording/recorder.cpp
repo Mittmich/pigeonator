@@ -232,11 +232,14 @@ FrameEvent EventRecorder::create_detection_frame(DetectionEvent detection_event,
     }
     cv::Mat frame = image_store->get(frame_timestamp).value();
     // Search for the detection in the detection event that matches the frame timestamp
-    for (auto& detection : detection_event.get_detections()) {
+    auto detections = detection_event.get_detections();
+    for (auto& detection : detections) { // Changed to use a reference for detection
         if (detection.get_frame_event().get_timestamp() == frame_timestamp) {
             // Draw bounding boxes on the frame if available
-            if (detection.get_bounding_boxes().has_value()) {
-                for (const auto& box : detection.get_bounding_boxes().value()) {
+            auto bounding_boxes_opt = detection.get_bounding_boxes(); // Store the optional
+            if (bounding_boxes_opt.has_value()) {
+                std::vector<cv::Rect> bounding_boxes_vec_copy = bounding_boxes_opt.value(); // Explicit copy of the vector
+                for (const auto& box : bounding_boxes_vec_copy) { // Iterate over the copied vector
                     cv::rectangle(frame, box, cv::Scalar(0, 255, 0), 2);
                 }
             }
@@ -253,7 +256,44 @@ FrameEvent EventRecorder::create_detection_frame(DetectionEvent detection_event,
 
 
 void EventRecorder::_write_detections() {
-
+    // Add all activations that are recorded to the detections
+    for (auto& activation : effector_buffer) {
+        // Find detections within 2 seconds of the activation
+        std::vector<time_t> write_timestamps;
+        for (auto& detection : detection_buffer) {
+            auto time_diff = std::abs(static_cast<long>(detection.get_timestamp() - activation.get_timestamp()));
+            if (time_diff < 2) { // Within 2 seconds
+                write_timestamps.push_back(detection.get_timestamp());
+            }
+        }
+        
+        // Add activation overlay to frames
+        for (auto& detection_frame : detection_buffer) {
+            _add_activation_overlay(detection_frame, activation, write_timestamps);
+        }
+    }
+    
+    // Create detection video writer if not already created
+    if (!detection_writer.isOpened()) {
+        std::string filename = "detection_" + std::to_string(std::time(nullptr)) + ".mp4";
+        std::filesystem::path full_path = std::filesystem::path(output_directory) / filename;
+        detection_writer.open(full_path.string(), cv::VideoWriter::fourcc('m', 'p', '4', 'v'), this->fps, this->frame_size, true);
+        if (!detection_writer.isOpened()) {
+            throw std::runtime_error("Could not open detection video writer.");
+        }
+    }
+    
+    // Write all detection frames to the detection video
+    for (auto& detection_frame : detection_buffer) {
+        if (image_store->get(detection_frame.get_timestamp()).has_value()) {
+            cv::Mat frame = image_store->get(detection_frame.get_timestamp()).value();
+            detection_writer.write(frame);
+        }
+    }
+    
+    // Clear buffers after writing
+    detection_buffer.clear();
+    effector_buffer.clear();
 }
 
 void EventRecorder::_update_detections(DetectionEvent detection_event) {
@@ -323,4 +363,56 @@ void EventRecorder::handle_detection(Event event) {
         video_buffer.clear();
         this->_update_detections(detection_event);
     }
+}
+
+void EventRecorder::handle_effector_action(Event event) {
+    if (event.type != EventType::EFFECTOR_ACTION) {
+        return;
+    }
+    // Add the effector action event to the buffer for later processing
+    effector_buffer.push_back(event);
+}
+
+void EventRecorder::_add_activation_overlay(FrameEvent& detection_frame, Event& activation, const std::vector<time_t>& write_timestamps) {
+    // Check if this frame's timestamp is in the write_timestamps list
+    bool should_write = false;
+    for (time_t timestamp : write_timestamps) {
+        if (detection_frame.get_timestamp() == timestamp) {
+            should_write = true;
+            break;
+        }
+    }
+    
+    if (!should_write) {
+        return;
+    }
+    
+    // Get the image from the image store
+    if (!image_store->get(detection_frame.get_timestamp()).has_value()) {
+        return;
+    }
+    
+    cv::Mat frame = image_store->get(detection_frame.get_timestamp()).value();
+    
+    // Get activation type from metadata (default to "ACTIVATION" if not available)
+    std::string activation_type = "ACTIVATION";
+    if (activation.get_meta_data().count("type") > 0) {
+        activation_type = activation.get_meta_data().at("type");
+    }
+    
+    // Calculate text size and position
+    int fontFace = cv::FONT_HERSHEY_DUPLEX;
+    double fontScale = 7.0;
+    int thickness = 2;
+    cv::Size textSize = cv::getTextSize(activation_type, fontFace, fontScale, thickness, nullptr);
+    
+    // Center the text on the frame
+    int textX = (frame.cols - textSize.width) / 2;
+    int textY = (frame.rows + textSize.height) / 2;
+    
+    // Add the text overlay in red color
+    cv::putText(frame, activation_type, cv::Point(textX, textY), fontFace, fontScale, cv::Scalar(0, 0, 255), thickness);
+    
+    // Put the modified image back to the store
+    image_store->put(detection_frame.get_timestamp(), frame);
 }
