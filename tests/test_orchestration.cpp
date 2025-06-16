@@ -67,7 +67,7 @@ TEST_CASE("VideoEventManager - Frame event propagation") {
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
     
     // Simulate frame
-    FrameEvent frame(std::time(nullptr), std::nullopt);
+    auto frame = std::make_shared<FrameEvent>(std::time(nullptr), std::nullopt);
     stream.simulate_frame(frame);
     
     // Allow time for processing
@@ -103,14 +103,15 @@ TEST_CASE("VideoEventManager - Event propagation") {
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
     
     // Push event to queue
-    Detection detection(std::time(nullptr), FrameEvent(std::time(nullptr), std::nullopt), std::nullopt);
-    DetectionEvent event(std::time(nullptr), {detection}, std::nullopt);
+    auto frame_event = std::make_shared<FrameEvent>(std::time(nullptr), std::nullopt);
+    Detection detection(std::time(nullptr), frame_event, std::nullopt);
+    auto event = std::make_shared<DetectionEvent>(std::time(nullptr), std::vector<Detection>{detection}, std::nullopt);
     writer->simulate_event(event);
     
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
     
     CHECK(subscriber->received_events.size() == 1);
-    CHECK(subscriber->received_events[0].type == EventType::DETECTION);
+    CHECK(subscriber->received_events[0]->type == EventType::DETECTION);
     
     manager.stop();
     manager_thread.join();
@@ -143,8 +144,9 @@ TEST_CASE("VideoEventManager - Multiple subscribers") {
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
     
     // Push event to queue
-    Detection detection(std::time(nullptr), FrameEvent(std::time(nullptr), std::nullopt), std::nullopt);
-    DetectionEvent event(std::time(nullptr), {detection}, std::nullopt);
+    auto frame_event = std::make_shared<FrameEvent>(std::time(nullptr), std::nullopt);
+    Detection detection(std::time(nullptr), frame_event, std::nullopt);
+    auto event = std::make_shared<DetectionEvent>(std::time(nullptr), std::vector<Detection>{detection}, std::nullopt);
     writer->simulate_event(event);
     
     std::this_thread::sleep_for(std::chrono::milliseconds(100));

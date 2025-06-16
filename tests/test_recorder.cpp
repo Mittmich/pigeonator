@@ -43,15 +43,15 @@ public:
     bool effector_action_handled = false;
     
 protected:
-    void handle_new_frame(FrameEvent& event) override {
+    void handle_new_frame(std::shared_ptr<FrameEvent> frame_event) override {
         new_frame_handled = true;
     }
     
-    void handle_detection(DetectionEvent& event) override {
+    void handle_detection(std::shared_ptr<DetectionEvent> detection_event) override {
         detection_handled = true;
     }
     
-    void handle_effector_action(Event& event) override {
+    void handle_effector_action(std::shared_ptr<Event> effector_event) override {
         effector_action_handled = true;
     }
 };
@@ -82,7 +82,7 @@ TEST_CASE("Recorder requires event queue to be set before starting") {
 TEST_CASE("Recorder can be started and stopped with event queue") {
     std::set<EventType> events = {EventType::NEW_FRAME};
     auto image_store = std::make_shared<ImageStore>(10);
-    auto event_queue = std::make_shared<std::queue<Event>>();
+    auto event_queue = std::make_shared<std::queue<std::shared_ptr<Event>>>();
     std::string temp_dir = create_temp_directory();
     
     MockRecorder recorder(events, image_store, temp_dir);
@@ -101,18 +101,18 @@ TEST_CASE("Recorder can be started and stopped with event queue") {
 TEST_CASE("Recorder only accepts events it's listening to") {
     std::set<EventType> events = {EventType::NEW_FRAME}; // Only listening to NEW_FRAME
     auto image_store = std::make_shared<ImageStore>(10);
-    auto event_queue = std::make_shared<std::queue<Event>>();
+    auto event_queue = std::make_shared<std::queue<std::shared_ptr<Event>>>();
     std::string temp_dir = create_temp_directory();
     
     MockRecorder recorder(events, image_store, temp_dir);
     recorder.set_event_queue(event_queue);
     
     // Notify with NEW_FRAME event (should be accepted)
-    FrameEvent frame_event(std::time(nullptr), std::nullopt);
+    auto frame_event = std::make_shared<FrameEvent>(std::time(nullptr), std::nullopt);
     recorder.notify(frame_event);
     
     // Notify with DETECTION event (should be ignored)
-    Event detection_event(EventType::DETECTION, std::time(nullptr), std::nullopt);
+    auto detection_event = std::make_shared<Event>(EventType::DETECTION, std::time(nullptr), std::nullopt);
     recorder.notify(detection_event);
     
     // Start recorder to process events
@@ -130,16 +130,16 @@ TEST_CASE("Recorder only accepts events it's listening to") {
 TEST_CASE("Recorder processes events in queue") {
     std::set<EventType> events = {EventType::NEW_FRAME, EventType::DETECTION, EventType::EFFECTOR_ACTION};
     auto image_store = std::make_shared<ImageStore>(10);
-    auto event_queue = std::make_shared<std::queue<Event>>();
+    auto event_queue = std::make_shared<std::queue<std::shared_ptr<Event>>>();
     std::string temp_dir = create_temp_directory();
     
     MockRecorder recorder(events, image_store, temp_dir);
     recorder.set_event_queue(event_queue);
     
     // Add different events
-    FrameEvent frame_event(std::time(nullptr), std::nullopt);
-    Event detection_event(EventType::DETECTION, std::time(nullptr), std::nullopt);
-    Event effector_event(EventType::EFFECTOR_ACTION, std::time(nullptr), std::nullopt);
+    auto frame_event = std::make_shared<FrameEvent>(std::time(nullptr), std::nullopt);
+    auto detection_event = std::make_shared<Event>(EventType::DETECTION, std::time(nullptr), std::nullopt);
+    auto effector_event = std::make_shared<Event>(EventType::EFFECTOR_ACTION, std::time(nullptr), std::nullopt);
     
     recorder.notify(frame_event);
     recorder.notify(detection_event);
@@ -173,7 +173,7 @@ TEST_CASE("ContinuousRecorder constructor initializes correctly") {
 TEST_CASE("ContinuousRecorder handles new frame events") {
     std::set<EventType> events = {EventType::NEW_FRAME};
     auto image_store = std::make_shared<ImageStore>(10);
-    auto event_queue = std::make_shared<std::queue<Event>>();
+    auto event_queue = std::make_shared<std::queue<std::shared_ptr<Event>>>();
     std::string temp_dir = create_temp_directory();
     
     ContinuousRecorder recorder(events, image_store, temp_dir);
@@ -185,7 +185,7 @@ TEST_CASE("ContinuousRecorder handles new frame events") {
     image_store->put(timestamp, test_image);
     
     // Create frame event with same timestamp
-    FrameEvent frame_event(timestamp, std::nullopt);
+    auto frame_event = std::make_shared<FrameEvent>(timestamp, std::nullopt);
     recorder.notify(frame_event);
     
     // Start recorder briefly to process the event
@@ -202,7 +202,7 @@ TEST_CASE("ContinuousRecorder handles new frame events") {
 TEST_CASE("ContinuousRecorder handles missing frames gracefully") {
     std::set<EventType> events = {EventType::NEW_FRAME};
     auto image_store = std::make_shared<ImageStore>(10);
-    auto event_queue = std::make_shared<std::queue<Event>>();
+    auto event_queue = std::make_shared<std::queue<std::shared_ptr<Event>>>();
     std::string temp_dir = create_temp_directory();
     
     ContinuousRecorder recorder(events, image_store, temp_dir);
@@ -210,7 +210,7 @@ TEST_CASE("ContinuousRecorder handles missing frames gracefully") {
     
     // Create frame event with timestamp that doesn't exist in image store
     time_t nonexistent_timestamp = 999999;
-    FrameEvent frame_event(nonexistent_timestamp, std::nullopt);
+    auto frame_event = std::make_shared<FrameEvent>(nonexistent_timestamp, std::nullopt);
     recorder.notify(frame_event);
     
     // Start recorder briefly to process the event
@@ -227,15 +227,15 @@ TEST_CASE("ContinuousRecorder handles missing frames gracefully") {
 TEST_CASE("ContinuousRecorder ignores detection and effector events") {
     std::set<EventType> events = {EventType::NEW_FRAME, EventType::DETECTION, EventType::EFFECTOR_ACTION};
     auto image_store = std::make_shared<ImageStore>(10);
-    auto event_queue = std::make_shared<std::queue<Event>>();
+    auto event_queue = std::make_shared<std::queue<std::shared_ptr<Event>>>();
     std::string temp_dir = create_temp_directory();
     
     ContinuousRecorder recorder(events, image_store, temp_dir);
     recorder.set_event_queue(event_queue);
     
     // Add non-frame events
-    Event detection_event(EventType::DETECTION, std::time(nullptr), std::nullopt);
-    Event effector_event(EventType::EFFECTOR_ACTION, std::time(nullptr), std::nullopt);
+    auto detection_event = std::make_shared<Event>(EventType::DETECTION, std::time(nullptr), std::nullopt);
+    auto effector_event = std::make_shared<Event>(EventType::EFFECTOR_ACTION, std::time(nullptr), std::nullopt);
     
     recorder.notify(detection_event);
     recorder.notify(effector_event);
@@ -254,7 +254,7 @@ TEST_CASE("ContinuousRecorder ignores detection and effector events") {
 TEST_CASE("Recorder destructor stops running recorder") {
     std::set<EventType> events = {EventType::NEW_FRAME};
     auto image_store = std::make_shared<ImageStore>(10);
-    auto event_queue = std::make_shared<std::queue<Event>>();
+    auto event_queue = std::make_shared<std::queue<std::shared_ptr<Event>>>();
     std::string temp_dir = create_temp_directory();
     
     {
@@ -273,7 +273,7 @@ TEST_CASE("Recorder destructor stops running recorder") {
 TEST_CASE("Recorder creates video file when started") {
     std::set<EventType> events = {EventType::NEW_FRAME};
     auto image_store = std::make_shared<ImageStore>(10);
-    auto event_queue = std::make_shared<std::queue<Event>>();
+    auto event_queue = std::make_shared<std::queue<std::shared_ptr<Event>>>();
     std::string temp_dir = create_temp_directory();
     
     ContinuousRecorder recorder(events, image_store, temp_dir);
@@ -285,7 +285,7 @@ TEST_CASE("Recorder creates video file when started") {
     image_store->put(timestamp, test_image);
     
     // Create frame event with same timestamp
-    FrameEvent frame_event(timestamp, std::nullopt);
+    auto frame_event = std::make_shared<FrameEvent>(timestamp, std::nullopt);
     recorder.notify(frame_event);
     
     recorder.start();
@@ -310,7 +310,7 @@ TEST_CASE("Recorder creates video file when started") {
 TEST_CASE("Recorder creates video file in specified directory") {
     std::set<EventType> events = {EventType::NEW_FRAME};
     auto image_store = std::make_shared<ImageStore>(10);
-    auto event_queue = std::make_shared<std::queue<Event>>();
+    auto event_queue = std::make_shared<std::queue<std::shared_ptr<Event>>>();
     std::string temp_dir = create_temp_directory();
     
     ContinuousRecorder recorder(events, image_store, temp_dir);
@@ -326,7 +326,7 @@ TEST_CASE("Recorder creates video file in specified directory") {
     image_store->put(timestamp, test_image);
     
     // Create frame event with same timestamp
-    FrameEvent frame_event(timestamp, std::nullopt);
+    auto frame_event = std::make_shared<FrameEvent>(timestamp, std::nullopt);
     recorder.notify(frame_event);
     
     recorder.start();
@@ -364,7 +364,7 @@ TEST_CASE("Recorder creates video file in specified directory") {
 
 // EventRecorder specific tests
 
-Detection create_test_detection(time_t timestamp, FrameEvent frame_event) {
+Detection create_test_detection(time_t timestamp, std::shared_ptr<FrameEvent> frame_event) {
     std::vector<std::string> labels = {"bird"};
     std::vector<float> confidences = {0.85f};
     std::vector<cv::Rect> boxes = {cv::Rect(10, 10, 50, 50)};
@@ -372,7 +372,7 @@ Detection create_test_detection(time_t timestamp, FrameEvent frame_event) {
 }
 
 DetectionEvent create_test_detection_event(time_t timestamp) {
-    FrameEvent frame_event(timestamp, std::nullopt);
+    auto frame_event = std::make_shared<FrameEvent>(timestamp, std::nullopt);
     std::vector<Detection> detections = {create_test_detection(timestamp, frame_event)};
     return DetectionEvent(timestamp, detections);
 }
@@ -391,23 +391,23 @@ public:
     ) : EventRecorder(listening_events, image_store, output_directory, slack, fps, look_back_frames, detection_buffer_size) {}
     
     // Expose protected methods for testing
-    FrameEvent test_create_detection_frame(DetectionEvent detection_event, time_t frame_timestamp) {
+    FrameEvent test_create_detection_frame(std::shared_ptr<DetectionEvent> detection_event, time_t frame_timestamp) {
         return create_detection_frame(detection_event, frame_timestamp);
     }
     
-    std::vector<FrameEvent> test_create_detection_frames(DetectionEvent detection_event) {
+    std::vector<FrameEvent> test_create_detection_frames(std::shared_ptr<DetectionEvent> detection_event) {
         return create_detection_frames(detection_event);
     }
     
-    void test_handle_new_frame(FrameEvent& event) {
+    void test_handle_new_frame(std::shared_ptr<FrameEvent> event) {
         handle_new_frame(event);
     }
     
-    void test_handle_detection(DetectionEvent& detection_event) {
+    void test_handle_detection(std::shared_ptr<DetectionEvent> detection_event) {
         handle_detection(detection_event);
     }
     
-    void test_handle_effector_action(Event event) {
+    void test_handle_effector_action(std::shared_ptr<Event> event) {
         handle_effector_action(event);
     }
 };
@@ -436,8 +436,8 @@ TEST_CASE("EventRecorder creates detection frame with bounding boxes") {
     cv::Mat test_image = create_video_image(100, 100);
     image_store->put(timestamp, test_image);
     
-    FrameEvent frame_event(timestamp, std::nullopt);
-    DetectionEvent detection_event = create_test_detection_event(timestamp);
+    auto frame_event = std::make_shared<FrameEvent>(timestamp, std::nullopt);
+    auto detection_event = std::make_shared<DetectionEvent>(create_test_detection_event(timestamp));
     
     // Create detection frame
     FrameEvent detection_frame = recorder.test_create_detection_frame(detection_event, timestamp);
@@ -457,7 +457,7 @@ TEST_CASE("EventRecorder handles new frame updates buffers") {
     std::string temp_dir = create_temp_directory();
     
     TestableEventRecorder recorder(events, image_store, temp_dir, 10, 30, 3, 5);
-    auto event_queue = std::make_shared<std::queue<Event>>();
+    auto event_queue = std::make_shared<std::queue<std::shared_ptr<Event>>>();
     recorder.set_event_queue(event_queue);
     
     // Setup test images
@@ -474,9 +474,9 @@ TEST_CASE("EventRecorder handles new frame updates buffers") {
     image_store->put(timestamp3, test_image3);
     
     // Create frame events
-    FrameEvent event1(timestamp1, std::nullopt);
-    FrameEvent event2(timestamp2, std::nullopt);
-    FrameEvent event3(timestamp3, std::nullopt);
+    auto event1 = std::make_shared<FrameEvent>(timestamp1, std::nullopt);
+    auto event2 = std::make_shared<FrameEvent>(timestamp2, std::nullopt);
+    auto event3 = std::make_shared<FrameEvent>(timestamp3, std::nullopt);
     
     // Handle frame events
     recorder.test_handle_new_frame(event1);
@@ -495,7 +495,7 @@ TEST_CASE("EventRecorder starts recording on detection event") {
     std::string temp_dir = create_temp_directory();
     
     TestableEventRecorder recorder(events, image_store, temp_dir, 5, 30, 2, 10);
-    auto event_queue = std::make_shared<std::queue<Event>>();
+    auto event_queue = std::make_shared<std::queue<std::shared_ptr<Event>>>();
     recorder.set_event_queue(event_queue);
     
     // Setup test images for look-back frames
@@ -505,12 +505,12 @@ TEST_CASE("EventRecorder starts recording on detection event") {
         cv::Mat test_image = create_video_image(1920, 1080);
         image_store->put(timestamp, test_image);
         
-        FrameEvent frame_event(timestamp, std::nullopt);
+        auto frame_event = std::make_shared<FrameEvent>(timestamp, std::nullopt);
         recorder.test_handle_new_frame(frame_event);
     }
     
     // Create detection event
-    DetectionEvent detection_event = create_test_detection_event(base_time + 1);
+    auto detection_event = std::make_shared<DetectionEvent>(create_test_detection_event(base_time + 1));
     // Handle detection - should start recording
     recorder.test_handle_detection(detection_event);
     
@@ -526,13 +526,13 @@ TEST_CASE("EventRecorder handles effector action events") {
     std::string temp_dir = create_temp_directory();
     
     TestableEventRecorder recorder(events, image_store, temp_dir);
-    auto event_queue = std::make_shared<std::queue<Event>>();
+    auto event_queue = std::make_shared<std::queue<std::shared_ptr<Event>>>();
     recorder.set_event_queue(event_queue);
     
     // Create effector action event
     time_t timestamp = std::time(nullptr);
     std::map<std::string, std::string> metadata = {{"type", "SPRAY"}};
-    Event effector_event(EventType::EFFECTOR_ACTION, timestamp, metadata);
+    auto effector_event = std::make_shared<Event>(EventType::EFFECTOR_ACTION, timestamp, metadata);
     
     // Handle effector action
     recorder.test_handle_effector_action(effector_event);
@@ -549,7 +549,7 @@ TEST_CASE("EventRecorder creates detection frames for multiple timestamps") {
     std::string temp_dir = create_temp_directory();
     
     TestableEventRecorder recorder(events, image_store, temp_dir, 10, 30, 3, 20);
-    auto event_queue = std::make_shared<std::queue<Event>>();
+    auto event_queue = std::make_shared<std::queue<std::shared_ptr<Event>>>();
     recorder.set_event_queue(event_queue);
     
     // Setup multiple test images
@@ -559,12 +559,12 @@ TEST_CASE("EventRecorder creates detection frames for multiple timestamps") {
         cv::Mat test_image = create_video_image(1920, 1080);
         image_store->put(timestamp, test_image);
         
-        FrameEvent frame_event(timestamp, std::nullopt);
+        auto frame_event = std::make_shared<FrameEvent>(timestamp, std::nullopt);
         recorder.test_handle_new_frame(frame_event);
     }
     
     // Create detection event
-    DetectionEvent detection_event = create_test_detection_event(base_time + 1);
+    auto detection_event = std::make_shared<DetectionEvent>(create_test_detection_event(base_time + 1));
     
     // Create detection frames
     std::vector<FrameEvent> detection_frames = recorder.test_create_detection_frames(detection_event);
@@ -608,12 +608,12 @@ TEST_CASE("EventRecorder handles missing image in store gracefully") {
     std::string temp_dir = create_temp_directory();
     
     TestableEventRecorder recorder(events, image_store, temp_dir);
-    auto event_queue = std::make_shared<std::queue<Event>>();
+    auto event_queue = std::make_shared<std::queue<std::shared_ptr<Event>>>();
     recorder.set_event_queue(event_queue);
     
     // Create frame event for timestamp that doesn't exist in image store
     time_t timestamp = std::time(nullptr);
-    FrameEvent frame_event(timestamp, std::nullopt);
+    auto frame_event = std::make_shared<FrameEvent>(timestamp, std::nullopt);
     
     // This should be handled gracefully
     recorder.test_handle_new_frame(frame_event);
@@ -631,7 +631,7 @@ TEST_CASE("EventRecorder buffer size limits are respected") {
     
     // Create recorder with small buffer size for testing
     TestableEventRecorder recorder(events, image_store, temp_dir, 5, 30, 2, 3);
-    auto event_queue = std::make_shared<std::queue<Event>>();
+    auto event_queue = std::make_shared<std::queue<std::shared_ptr<Event>>>();
     recorder.set_event_queue(event_queue);
     
     time_t base_time = std::time(nullptr);
@@ -642,7 +642,7 @@ TEST_CASE("EventRecorder buffer size limits are respected") {
         cv::Mat test_image = create_video_image(1920, 1080);
         image_store->put(timestamp, test_image);
         
-        FrameEvent frame_event(timestamp, std::nullopt);
+        auto frame_event = std::make_shared<FrameEvent>(timestamp, std::nullopt);
         recorder.test_handle_new_frame(frame_event);
     }
     
@@ -658,7 +658,7 @@ TEST_CASE("EventRecorder creates detection video file when recording") {
     std::string temp_dir = create_temp_directory();
     
     TestableEventRecorder recorder(events, image_store, temp_dir, 3, 30, 2, 2); // Small detection buffer
-    auto event_queue = std::make_shared<std::queue<Event>>();
+    auto event_queue = std::make_shared<std::queue<std::shared_ptr<Event>>>();
     recorder.set_event_queue(event_queue);
     
     time_t base_time = std::time(nullptr);
@@ -669,12 +669,12 @@ TEST_CASE("EventRecorder creates detection video file when recording") {
         cv::Mat test_image = create_video_image(1920, 1080);
         image_store->put(timestamp, test_image);
         
-        FrameEvent frame_event(timestamp, std::nullopt);
+        auto frame_event = std::make_shared<FrameEvent>(timestamp, std::nullopt);
         recorder.test_handle_new_frame(frame_event);
         
         // Add detection events to trigger buffer overflow and video creation
         if (i > 1) {
-            DetectionEvent detection_event = create_test_detection_event(timestamp);
+            auto detection_event = std::make_shared<DetectionEvent>(create_test_detection_event(timestamp));
             recorder.test_handle_detection(detection_event);
         }
     }
@@ -685,7 +685,7 @@ TEST_CASE("EventRecorder creates detection video file when recording") {
         cv::Mat test_image = create_video_image(1920, 1080);
         image_store->put(timestamp, test_image);
         
-        FrameEvent frame_event(timestamp, std::nullopt);
+        auto frame_event = std::make_shared<FrameEvent>(timestamp, std::nullopt);
         recorder.test_handle_new_frame(frame_event);
     }
     
@@ -712,7 +712,7 @@ TEST_CASE("EventRecorder full integration test with notify interface") {
     std::string temp_dir = create_temp_directory();
     
     EventRecorder recorder(events, image_store, temp_dir, 3, 30, 2, 5);
-    auto event_queue = std::make_shared<std::queue<Event>>();
+    auto event_queue = std::make_shared<std::queue<std::shared_ptr<Event>>>();
     recorder.set_event_queue(event_queue);
     
     time_t base_time = std::time(nullptr);
@@ -723,7 +723,7 @@ TEST_CASE("EventRecorder full integration test with notify interface") {
         cv::Mat test_image = create_video_image(1920, 1080);
         image_store->put(timestamp, test_image);
         
-        FrameEvent frame_event(timestamp, std::nullopt);
+        auto frame_event = std::make_shared<FrameEvent>(timestamp, std::nullopt);
         recorder.notify(frame_event);
     }
     
@@ -732,14 +732,14 @@ TEST_CASE("EventRecorder full integration test with notify interface") {
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
     
     // Trigger a detection event (should start recording)
-    DetectionEvent detection_event = create_test_detection_event(base_time + 2);
+    auto detection_event = std::make_shared<DetectionEvent>(create_test_detection_event(base_time + 2));
     recorder.notify(detection_event);
     
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
     
     // Add effector action
     std::map<std::string, std::string> metadata = {{"type", "SPRAY"}};
-    Event effector_event(EventType::EFFECTOR_ACTION, base_time + 3, metadata);
+    auto effector_event = std::make_shared<Event>(EventType::EFFECTOR_ACTION, base_time + 3, metadata);
     recorder.notify(effector_event);
     
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
@@ -750,7 +750,7 @@ TEST_CASE("EventRecorder full integration test with notify interface") {
         cv::Mat test_image = create_video_image(1920, 1080);
         image_store->put(timestamp, test_image);
         
-        FrameEvent frame_event(timestamp, std::nullopt);
+        auto frame_event = std::make_shared<FrameEvent>(timestamp, std::nullopt);
         recorder.notify(frame_event);
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
@@ -771,15 +771,15 @@ TEST_CASE("EventRecorder notify interface filtering") {
     std::string temp_dir = create_temp_directory();
     
     EventRecorder recorder(events, image_store, temp_dir);
-    auto event_queue = std::make_shared<std::queue<Event>>();
+    auto event_queue = std::make_shared<std::queue<std::shared_ptr<Event>>>();
     recorder.set_event_queue(event_queue);
     
     time_t timestamp = std::time(nullptr);
     
     // Create events of different types
-    FrameEvent frame_event(timestamp, std::nullopt);
-    DetectionEvent detection_event = create_test_detection_event(timestamp);
-    Event effector_event(EventType::EFFECTOR_ACTION, timestamp, std::nullopt);
+    auto frame_event = std::make_shared<FrameEvent>(timestamp, std::nullopt);
+    auto detection_event = std::make_shared<DetectionEvent>(create_test_detection_event(timestamp));
+    auto effector_event = std::make_shared<Event>(EventType::EFFECTOR_ACTION, timestamp, std::nullopt);
     
     // Start recorder briefly to process events
     recorder.start();

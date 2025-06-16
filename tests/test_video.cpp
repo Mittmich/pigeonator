@@ -66,7 +66,7 @@ TEST_CASE("Single frame is enqued correctly by stream") {
     cv::Mat img = create_random_image(3, 3);
     cam_capture.setMockFrames({img});
     Stream stream(store, &cam_capture);
-    auto frame_queue = std::make_shared<std::queue<FrameEvent>>();
+    auto frame_queue = std::make_shared<std::queue<std::shared_ptr<FrameEvent>>>();
     stream.register_frame_queue(frame_queue);
     stream.start();
     // Wait for 500 ms to allow the stream to process the frame
@@ -74,8 +74,8 @@ TEST_CASE("Single frame is enqued correctly by stream") {
     // stop the stream
     stream.stop();
     CHECK(frame_queue->size() == 1);
-    FrameEvent frame_event = frame_queue->front();
-    cv::Mat image_retrieved = store->get(frame_event.get_timestamp()).value();
+    std::shared_ptr<FrameEvent> frame_event = frame_queue->front();
+    cv::Mat image_retrieved = store->get(frame_event->get_timestamp()).value();
     CHECK(cv::countNonZero(image_retrieved != img) == 0);
 }
 
