@@ -49,7 +49,7 @@ std::vector<Detection> DetectionEvent::get_detections()
 
 Detection::Detection(
     time_t timestamp,
-    FrameEvent frame_event,
+    std::shared_ptr<FrameEvent> frame_event,
     std::optional<std::vector<std::string>> labels,
     std::optional<std::vector<float>> confidences,
     std::optional<std::vector<cv::Rect>> bounding_boxes,
@@ -66,7 +66,7 @@ Detection::Detection(
 Detection::~Detection() = default;
 
 
-FrameEvent Detection::get_frame_event()
+std::shared_ptr<FrameEvent> Detection::get_frame_event()
 {
     return frame_event;
 }

@@ -2,8 +2,11 @@ cmake_minimum_required(VERSION 3.22)
 
 project(pigeonator)
 
+# Include Conan toolchain to set up dependencies
+include(${CMAKE_BINARY_DIR}/conan_toolchain.cmake)
 
 find_package(OpenCV REQUIRED)
+find_package(doctest REQUIRED)
 #include_directories( ${OpenCV_INCLUDE_DIRS} )
 
 #find_package(PkgConfig REQUIRED)
@@ -31,10 +34,9 @@ target_include_directories(pgn PRIVATE
         "${PROJECT_SOURCE_DIR}/birdhub/events"
         "${PROJECT_SOURCE_DIR}/birdhub/detection"
         "${PROJECT_SOURCE_DIR}/birdhub/recording"
-        "${PROJECT_SOURCE_DIR}/birdhub/memory_management"
-        ${OpenCV_INCLUDE_DIRS} )
-target_link_libraries(pgn PRIVATE ${LIBCAMERA_LIBRARIES} ${OpenCV_LIBS} Video Events Orchestration Detection Recorder MemoryManagement)
-target_link_libraries(example PRIVATE ${LIBCAMERA_LIBRARIES} ${OpenCV_LIBS} Video Events Orchestration Detection Recorder MemoryManagement)
+        "${PROJECT_SOURCE_DIR}/birdhub/memory_management"        ${OpenCV_INCLUDE_DIRS} )
+target_link_libraries(pgn PRIVATE ${LIBCAMERA_LIBRARIES} opencv::opencv Video Events Orchestration Detection Recorder MemoryManagement)
+target_link_libraries(example PRIVATE ${LIBCAMERA_LIBRARIES} opencv::opencv Video Events Orchestration Detection Recorder MemoryManagement)
 # tests
 
 add_subdirectory(tests/)

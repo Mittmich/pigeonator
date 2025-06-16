@@ -205,7 +205,7 @@ Stream::Stream(std::shared_ptr<ImageStore> image_store, CameraCapture *cam_captu
     : image_store(image_store), cam_capture(cam_capture), write_timestamps(write_timestamps) {
 }
 
-void Stream::register_frame_queue(std::shared_ptr<std::queue<FrameEvent>> frame_queue) {
+void Stream::register_frame_queue(std::shared_ptr<std::queue<std::shared_ptr<FrameEvent>>> frame_queue) {
     this->frame_queue = frame_queue;
     this->queue_registered = true;
 }
@@ -246,5 +246,5 @@ void Stream::enque_frame_token() {
     std::time_t timestamp = std::time(0);
     FrameEvent frame_event = FrameEvent(timestamp, std::nullopt);
     image_store->put(timestamp, frame);
-    this->frame_queue->push(frame_event);
+    this->frame_queue->push(std::make_shared<FrameEvent>(frame_event));
 }

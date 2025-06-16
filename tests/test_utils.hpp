@@ -16,14 +16,14 @@ class MockStream : public Stream {
 public:
     MockStream(std::shared_ptr<ImageStore> image_store, CameraCapture* cam_capture);
 
-    void register_frame_queue(std::shared_ptr<std::queue<FrameEvent>> queue) override;
+    void register_frame_queue(std::shared_ptr<std::queue<std::shared_ptr<FrameEvent>>> frame_queue) override;
 
     void start() override;
 
     void stop() override;
 
     // Test helper methods
-    void simulate_frame(const FrameEvent& frame);
+    void simulate_frame(std::shared_ptr<FrameEvent> frame);
 
     bool is_running();
     bool has_queue();
@@ -33,15 +33,15 @@ public:
 class MockSubscriber : public Subscriber {
 public:
     std::set<EventType> event_types;
-    std::vector<Event> received_events;
+    std::vector<std::shared_ptr<Event>> received_events;
     bool is_running = false;
-    void set_event_queue(std::shared_ptr<std::queue<Event>> queue) override;
+    void set_event_queue(std::shared_ptr<std::queue<std::shared_ptr<Event>>> queue) override;
     void start() override;
     void stop() override;
-    void notify(Event event) override;
+    void notify(std::shared_ptr<Event> event) override;
     std::set<EventType> listening_to() override;
-    std::shared_ptr<std::queue<Event>> event_queue;
-    void simulate_event(Event event);
+    std::shared_ptr<std::queue<std::shared_ptr<Event>>> event_queue;
+    void simulate_event(std::shared_ptr<Event> event);
 };
 
 

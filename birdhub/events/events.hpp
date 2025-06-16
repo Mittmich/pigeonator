@@ -60,8 +60,8 @@ public:
     virtual std::set<EventType> listening_to() = 0;
     virtual void start() = 0;
     virtual void stop() = 0;
-    virtual void set_event_queue(std::shared_ptr<std::queue<Event>> event_queue) = 0;
-    virtual void notify(Event event) = 0;
+    virtual void set_event_queue(std::shared_ptr<std::queue<std::shared_ptr<Event>>> event_queue) = 0;
+    virtual void notify(std::shared_ptr<Event> event) = 0;
 };
 
 
@@ -69,7 +69,7 @@ class Detection {
     public:
     Detection(
          time_t timestamp,
-         FrameEvent frame_event,
+         std::shared_ptr<FrameEvent> frame_event,
          std::optional<std::vector<std::string>> labels = std::nullopt,
          std::optional<std::vector<float>> confidences = std::nullopt,
          std::optional<std::vector<cv::Rect>> bounding_boxes = std::nullopt,
@@ -77,7 +77,7 @@ class Detection {
          std::optional<std::map<std::string, std::string>> meta_data = std::nullopt);
     ~Detection();
     time_t get_timestamp();
-    FrameEvent get_frame_event();
+    std::shared_ptr<FrameEvent> get_frame_event();
     std::optional<std::vector<std::string>> get_labels();
     std::optional<std::vector<float>> get_confidences();
     std::optional<std::vector<cv::Rect>> get_bounding_boxes();
@@ -85,7 +85,7 @@ class Detection {
     std::optional<std::map<std::string, std::string>> get_meta_data();
 private:
     time_t timestamp;
-    FrameEvent frame_event;
+    std::shared_ptr<FrameEvent> frame_event;
     std::optional<std::vector<std::string>> labels;
     std::optional<std::vector<float>> confidences;
     std::optional<std::vector<cv::Rect>> bounding_boxes;

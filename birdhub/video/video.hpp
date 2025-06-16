@@ -91,7 +91,7 @@ public:
         bool write_timestamps = true);
     // registering the frame queue needs to be separte from the constructor because
     // the evenemanager needs to attach it to the stream
-    virtual void register_frame_queue(std::shared_ptr<std::queue<FrameEvent>> frame_queue);
+    virtual void register_frame_queue(std::shared_ptr<std::queue<std::shared_ptr<FrameEvent>>> frame_queue);
     virtual void start();
     virtual void stop();
 
@@ -100,7 +100,7 @@ protected:
     std::shared_ptr<ImageStore> image_store;
     bool write_timestamps;
     CameraCapture *cam_capture;
-    std::shared_ptr<std::queue<FrameEvent>> frame_queue;
+    std::shared_ptr<std::queue<std::shared_ptr<FrameEvent>>> frame_queue;
     void _start();
     std::thread queue_thread;
     bool running = false;

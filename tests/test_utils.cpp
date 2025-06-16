@@ -21,8 +21,8 @@ void ConstantMockCameraCapture::stopStreaming() {};
 // MockStream class
 MockStream::MockStream(std::shared_ptr<ImageStore> image_store, CameraCapture* cam_capture) 
         : Stream(image_store, cam_capture) {};
-void MockStream::register_frame_queue(std::shared_ptr<std::queue<FrameEvent>> queue) {
-        frame_queue = queue;
+void MockStream::register_frame_queue(std::shared_ptr<std::queue<std::shared_ptr<FrameEvent>>> frame_queue) {
+        this->frame_queue = frame_queue;
         queue_registered = true;
     };
 void MockStream::start() {
@@ -32,7 +32,7 @@ void MockStream::stop() {
         running = false;
     };
 
-void MockStream::simulate_frame(const FrameEvent& frame) {
+void MockStream::simulate_frame(std::shared_ptr<FrameEvent> frame) {
         if (queue_registered && frame_queue) {
             frame_queue->push(frame);
         }
@@ -48,8 +48,8 @@ bool MockStream::has_queue() {
 
 // MockSubscriber class
 
-void MockSubscriber::set_event_queue(std::shared_ptr<std::queue<Event>> queue) {
-        event_queue = queue;
+void MockSubscriber::set_event_queue(std::shared_ptr<std::queue<std::shared_ptr<Event>>> event_queue) {
+        this->event_queue = event_queue;
     };
 
 void MockSubscriber::start() {
@@ -60,11 +60,11 @@ void MockSubscriber::stop() {
         is_running = false;
     };
 
-void MockSubscriber::notify(Event event) {
+void MockSubscriber::notify(std::shared_ptr<Event> event) {
         received_events.push_back(event);
     };
 
-void MockSubscriber::simulate_event(Event event) {
+void MockSubscriber::simulate_event(std::shared_ptr<Event> event) {
         if (event_queue) {
             event_queue->push(event);
         }

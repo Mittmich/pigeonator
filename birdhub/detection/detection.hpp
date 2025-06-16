@@ -19,12 +19,12 @@ public:
     std::set<EventType> listening_to() override;
     void start() override;
     void stop() override;
-    void set_event_queue(std::shared_ptr<std::queue<Event>> event_queue) override;
-    void notify(Event event) override;
-    virtual std::optional<DetectionEvent> detect(FrameEvent &frame_event) = 0;
+    void set_event_queue(std::shared_ptr<std::queue<std::shared_ptr<Event>>> event_queue) override;
+    void notify(std::shared_ptr<Event> event) override;
+    virtual std::optional<DetectionEvent> detect(std::shared_ptr<FrameEvent> frame_event) = 0;
 
 protected:
-    std::shared_ptr<std::queue<Event>> event_write_queue;
+    std::shared_ptr<std::queue<std::shared_ptr<Event>>> event_write_queue;
     std::set<EventType> listening_events;
     std::shared_ptr<ImageStore> image_store;
     void _start();
@@ -32,7 +32,7 @@ protected:
     bool running = false;
     bool queue_registered = false;
     void poll_read_queue();
-    std::queue<FrameEvent> event_read_queue;
+    std::queue<std::shared_ptr<FrameEvent>> event_read_queue;
 };
 
 // create subclass of Detector for motion detection
@@ -49,7 +49,7 @@ public:
         std::chrono::seconds max_delay
     );
     ~MotionDetector();
-    std::optional<DetectionEvent> detect(FrameEvent &frame_event) override;
+    std::optional<DetectionEvent> detect(std::shared_ptr<FrameEvent> frame_event) override;
 private:
     int threshold;
     int blur;

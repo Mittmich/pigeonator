@@ -24,8 +24,8 @@ public:
     std::set<EventType> listening_to() override;
     void start() override;
     void stop() override;
-    void set_event_queue(std::shared_ptr<std::queue<Event>> event_queue) override;
-    void notify(Event event) override;
+    void set_event_queue(std::shared_ptr<std::queue<std::shared_ptr<Event>>> event_queue) override;
+    void notify(std::shared_ptr<Event> event) override;
 protected:
     std::set<EventType> listening_events;
     // add video frame size
@@ -33,19 +33,19 @@ protected:
     int fps = 30;
     std::string output_directory;
     std::shared_ptr<ImageStore> image_store;
-    std::shared_ptr<std::queue<Event>> event_queue;
+    std::shared_ptr<std::queue<std::shared_ptr<Event>>> event_queue;
     std::thread recording_thread;
     bool running = false;
     bool queue_registered = false;
     void _start();
     // define pure virtual functions for handling events
-    virtual void handle_new_frame(Event event) = 0;
-    virtual void handle_detection(Event event) = 0;
-    virtual void handle_effector_action(Event event) = 0;
+    virtual void handle_new_frame(std::shared_ptr<FrameEvent> frame_event) = 0;
+    virtual void handle_detection(std::shared_ptr<DetectionEvent> detection_event) = 0;
+    virtual void handle_effector_action(std::shared_ptr<Event> effector_event) = 0;
     void poll_read_queue();
     // video writer for recording
     cv::VideoWriter video_writer;
-    std::queue<Event> event_read_queue;
+    std::queue<std::shared_ptr<Event>> event_read_queue;
     std::mutex queue_mutex; // Protect access to event_read_queue
 };
 
@@ -59,9 +59,9 @@ public:
     );
     ~ContinuousRecorder();
 protected:
-    void handle_new_frame(Event event) override;
-    void handle_detection(Event event) override;
-    void handle_effector_action(Event event) override;
+    void handle_new_frame(std::shared_ptr<FrameEvent> frame_event);
+    void handle_detection(std::shared_ptr<DetectionEvent> detection_event);
+    void handle_effector_action(std::shared_ptr<Event> effector_event);
 };
 
 class EventRecorder : public Recorder {
@@ -77,17 +77,17 @@ public:
     );
     ~EventRecorder();
 protected:
-    void handle_new_frame(Event event) override;
-    void handle_detection(Event event) override;
-    void handle_effector_action(Event event) override;
-    void _update_buffers(FrameEvent frame_event);
+    void handle_new_frame(std::shared_ptr<FrameEvent> frame_event);
+    void handle_detection(std::shared_ptr<DetectionEvent> detection_event);
+    void handle_effector_action(std::shared_ptr<Event> effector_event);
+    void _update_buffers(std::shared_ptr<FrameEvent> frame_event);
     void _write_detections();
     void _clear_buffers();
     void _close_video_writers();
-    void _update_detections(DetectionEvent detection_event);
-    std::vector<FrameEvent> create_detection_frames(DetectionEvent detection_event);
-    FrameEvent create_detection_frame(DetectionEvent detection_event, time_t frame_timestamp);
-    void _add_activation_overlay(FrameEvent& detection_frame, Event& activation, const std::vector<time_t>& write_timestamps);
+    void _update_detections(std::shared_ptr<DetectionEvent> detection_event);
+    std::vector<FrameEvent> create_detection_frames(std::shared_ptr<DetectionEvent> detection_event);
+    FrameEvent create_detection_frame(std::shared_ptr<DetectionEvent> detection_event, time_t frame_timestamp);
+    void _add_activation_overlay(FrameEvent detection_frame, std::shared_ptr<Event> activation, const std::vector<time_t>& write_timestamps);
     // Additional parameters for event recording
     int slack; // Number of frames wait until stop recording
     int fps; // frames per second for the video
@@ -101,7 +101,7 @@ protected:
     // Buffer for detection events
     std::deque<FrameEvent> detection_buffer;
     // Buffer for effector actions
-    std::deque<Event> effector_buffer;
+    std::deque<std::shared_ptr<Event>> effector_buffer;
     // Buffer for video frames
     std::deque<time_t> video_buffer;
     std::deque<time_t> detection_video_buffer;;

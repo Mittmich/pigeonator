@@ -9,6 +9,7 @@ birdhub.egg-info/*
 .vscode
 logs/*
 build/*
+build-debug/*
 *.jpg
 train_model/dataset_v8/*
 train_model/wandb/*

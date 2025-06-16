@@ -39,8 +39,8 @@ public:
 private:
     Stream &stream;
     std::vector<std::shared_ptr<Subscriber>> subscribers;
-    std::shared_ptr<std::queue<Event>> event_queue;
-    std::shared_ptr<std::queue<FrameEvent>> frame_queue;
+    std::shared_ptr<std::queue<std::shared_ptr<Event>>>  event_queue;
+    std::shared_ptr<std::queue<std::shared_ptr<FrameEvent>>> frame_queue;
     bool running = false;
 };
 

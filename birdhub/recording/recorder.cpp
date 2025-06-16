@@ -26,14 +26,14 @@ std::set<EventType> Recorder::listening_to() {
     return listening_events;
 }
 
-void Recorder::set_event_queue(std::shared_ptr<std::queue<Event>> event_queue) {
+void Recorder::set_event_queue(std::shared_ptr<std::queue<std::shared_ptr<Event>>> event_queue) {
     this->event_queue = event_queue;
     this->queue_registered = true;
 }
 
-void Recorder::notify(Event event) {
+void Recorder::notify(std::shared_ptr<Event> event) {
     // check if event is in listening events
-    if (listening_events.find(event.type) == listening_events.end()) {
+    if (listening_events.find(event->type) == listening_events.end()) {
         return;
     }
     // thread-safe push the event to the read queue
@@ -82,7 +82,7 @@ void Recorder::_start() {
 }
 
 void Recorder::poll_read_queue() {
-    std::optional<Event> event_opt;
+    std::optional<std::shared_ptr<Event>> event_opt;
     
     // Thread-safe check and pop from queue
     {
@@ -98,19 +98,24 @@ void Recorder::poll_read_queue() {
         return;
     }
     
-    Event event = event_opt.value();
+    std::shared_ptr<Event> event = event_opt.value();
     
-    // Process event outside the lock
-    switch (event.type) {
-        case EventType::NEW_FRAME:
-            handle_new_frame(event);
+    // Process event outside the lock with proper casting
+    switch (event->type) {
+        case EventType::NEW_FRAME: {
+            std::shared_ptr<FrameEvent> frame_event = std::static_pointer_cast<FrameEvent>(event);
+            handle_new_frame(frame_event);
             break;
-        case EventType::DETECTION:
-            handle_detection(event);
+        }
+        case EventType::DETECTION: {
+            std::shared_ptr<DetectionEvent> detection_event = std::static_pointer_cast<DetectionEvent>(event);
+            handle_detection(detection_event);
             break;
-        case EventType::EFFECTOR_ACTION:
+        }
+        case EventType::EFFECTOR_ACTION: {
             handle_effector_action(event);
             break;
+        }
         default:
             // Unknown event type, do nothing
             break;
@@ -130,28 +135,19 @@ ContinuousRecorder::~ContinuousRecorder() {
     }
 }
 
-void ContinuousRecorder::handle_new_frame(Event event) {
-    // Check if this is actually a FrameEvent
-    if (event.type != EventType::NEW_FRAME) {
-        return;
-    }
-    
-    // Since we confirmed it's a NEW_FRAME event type, we can safely cast
-    // In a production system, you might want to use dynamic_cast for safety
-    FrameEvent& frame_event = static_cast<FrameEvent&>(event);
-    
+void ContinuousRecorder::handle_new_frame(std::shared_ptr<FrameEvent> frame_event) {
     // Check if the image exists in the image store
-    if (!image_store->get(frame_event.get_timestamp()).has_value()) {
+    if (!image_store->get(frame_event->get_timestamp()).has_value()) {
         return; // No image available for this timestamp
     }
-    cv::Mat frame = image_store->get(frame_event.get_timestamp()).value();
+    cv::Mat frame = image_store->get(frame_event->get_timestamp()).value();
     // Write the frame to the video file
     video_writer.write(frame);
 }
-void ContinuousRecorder::handle_detection(Event event) {
+void ContinuousRecorder::handle_detection(std::shared_ptr<DetectionEvent> detection_event) {
     // For continuous recording, we ignore detection events
 }
-void ContinuousRecorder::handle_effector_action(Event event) {
+void ContinuousRecorder::handle_effector_action(std::shared_ptr<Event> effector_event) {
     // For continuous recording, we ignore effector action events
 };
 
@@ -174,11 +170,11 @@ EventRecorder::~EventRecorder() {
     }
 };
 
-void EventRecorder::_update_buffers(FrameEvent frame_event) {
+void EventRecorder::_update_buffers(std::shared_ptr<FrameEvent> frame_event) {
     // Add the frame event to the video buffer
-    video_buffer.push_back(frame_event.get_timestamp());
+    video_buffer.push_back(frame_event->get_timestamp());
     // Add the frame event to the detection buffer if it is a detection event
-    detection_video_buffer.push_back(frame_event.get_timestamp());
+    detection_video_buffer.push_back(frame_event->get_timestamp());
     // If we have more frames than look_back_frames, remove the oldest one
     if (video_buffer.size() > look_back_frames) {
         video_buffer.pop_front();
@@ -207,7 +203,7 @@ void EventRecorder::_close_video_writers() {
     }
 }
 
-std::vector<FrameEvent> EventRecorder::create_detection_frames(DetectionEvent detection_event) {
+std::vector<FrameEvent> EventRecorder::create_detection_frames(std::shared_ptr<DetectionEvent> detection_event) {
     std::vector<FrameEvent> detection_frames;
     if (this->recording) {
         for (const auto& timestamp : detection_video_buffer) {
@@ -225,14 +221,14 @@ std::vector<FrameEvent> EventRecorder::create_detection_frames(DetectionEvent de
     return detection_frames;
 }
 
-FrameEvent EventRecorder::create_detection_frame(DetectionEvent detection_event, time_t frame_timestamp) {
+FrameEvent EventRecorder::create_detection_frame(std::shared_ptr<DetectionEvent>  detection_event, time_t frame_timestamp) {
     // Retrive the image from the image store
     if (image_store->get(frame_timestamp).has_value()) {
         cv::Mat frame = image_store->get(frame_timestamp).value();
         // Search for the detection in the detection event that matches the frame timestamp
-        auto detections = detection_event.get_detections();
+        auto detections = detection_event->get_detections();
         for (auto& detection : detections) { // Changed to use a reference for detection
-            if (detection.get_frame_event().get_timestamp() == frame_timestamp) {
+            if (detection.get_frame_event()->get_timestamp() == frame_timestamp) {
                 // Draw bounding boxes on the frame if available
                 auto bounding_boxes_opt = detection.get_bounding_boxes();
                 auto labels_opt = detection.get_labels(); // Assuming this method exists to get labels
@@ -267,7 +263,7 @@ FrameEvent EventRecorder::create_detection_frame(DetectionEvent detection_event,
         frame_timestamp,
         std::make_optional<std::map<std::string, std::string>>({
             {"type", "detection_frame"},
-            {"detection_count", std::to_string(detection_event.get_detections().size())}
+            {"detection_count", std::to_string(detection_event->get_detections().size())}
         })
     );
 }
@@ -279,7 +275,7 @@ void EventRecorder::_write_detections() {
         // Find detections within 2 seconds of the activation
         std::vector<time_t> write_timestamps;
         for (auto& detection : detection_buffer) {
-            auto time_diff = std::abs(static_cast<long>(detection.get_timestamp() - activation.get_timestamp()));
+            auto time_diff = std::abs(static_cast<long>(detection.get_timestamp() - activation->get_timestamp()));
             if (time_diff < 2) { // Within 2 seconds
                 write_timestamps.push_back(detection.get_timestamp());
             }
@@ -314,7 +310,7 @@ void EventRecorder::_write_detections() {
     effector_buffer.clear();
 }
 
-void EventRecorder::_update_detections(DetectionEvent detection_event) {
+void EventRecorder::_update_detections(std::shared_ptr<DetectionEvent> detection_event) {
     std::vector<FrameEvent> detection_frames = this->create_detection_frames(detection_event);
     // Add the detection frames to the detection buffer
     for (const auto& detection : detection_frames) {
@@ -322,16 +318,12 @@ void EventRecorder::_update_detections(DetectionEvent detection_event) {
     }
 }
 
-void EventRecorder::handle_new_frame(Event event) {
-    if (event.type != EventType::NEW_FRAME) {
-        return;
-    }
-    FrameEvent& frame_event = static_cast<FrameEvent&>(event);
+void EventRecorder::handle_new_frame(std::shared_ptr<FrameEvent> frame_event) {
     // Check if the image exists in the image store
-    if (!image_store->get(frame_event.get_timestamp()).has_value()) {
+    if (!image_store->get(frame_event->get_timestamp()).has_value()) {
         return; // No image available for this timestamp
     }
-    cv::Mat frame = image_store->get(frame_event.get_timestamp()).value();
+    cv::Mat frame = image_store->get(frame_event->get_timestamp()).value();
     this->_update_buffers(frame_event);
     // Check  whether we should write detections to video
     if (this->detection_buffer.size() > this->detection_buffer_size) {
@@ -342,8 +334,8 @@ void EventRecorder::handle_new_frame(Event event) {
         this->_stop_recording_in--;
     } else if (this->video_writer.isOpened()) {
         // call update detections with empty detection event
-        DetectionEvent empty_detection_event(frame_event.get_timestamp(), {}, std::nullopt);
-        this->_update_detections(empty_detection_event);
+        DetectionEvent empty_detection_event(frame_event->get_timestamp(), {}, std::nullopt);
+        this->_update_detections(std::make_shared<DetectionEvent>(empty_detection_event));
         this->_write_detections();
         this->_clear_buffers();
         this->_close_video_writers();
@@ -351,11 +343,7 @@ void EventRecorder::handle_new_frame(Event event) {
     }
 };
 
-void EventRecorder::handle_detection(Event event) {
-    if (event.type != EventType::DETECTION) {
-        return;
-    }
-    DetectionEvent& detection_event = static_cast<DetectionEvent&>(event);
+void EventRecorder::handle_detection(std::shared_ptr<DetectionEvent> detection_event) {
     if (this->recording){
         this->_stop_recording_in = this->slack;
         this->_update_detections(detection_event);
@@ -388,15 +376,12 @@ void EventRecorder::handle_detection(Event event) {
     }
 }
 
-void EventRecorder::handle_effector_action(Event event) {
-    if (event.type != EventType::EFFECTOR_ACTION) {
-        return;
-    }
+void EventRecorder::handle_effector_action(std::shared_ptr<Event> effector_event) {
     // Add the effector action event to the buffer for later processing
-    effector_buffer.push_back(event);
+    effector_buffer.push_back(effector_event);
 }
 
-void EventRecorder::_add_activation_overlay(FrameEvent& detection_frame, Event& activation, const std::vector<time_t>& write_timestamps) {
+void EventRecorder::_add_activation_overlay(FrameEvent detection_frame, std::shared_ptr<Event> activation, const std::vector<time_t>& write_timestamps) {
     // Check if this frame's timestamp is in the write_timestamps list
     bool should_write = false;
     for (time_t timestamp : write_timestamps) {
@@ -419,8 +404,8 @@ void EventRecorder::_add_activation_overlay(FrameEvent& detection_frame, Event& 
     
     // Get activation type from metadata (default to "ACTIVATION" if not available)
     std::string activation_type = "ACTIVATION";
-    if (activation.get_meta_data().count("type") > 0) {
-        activation_type = activation.get_meta_data().at("type");
+    if (activation->get_meta_data().count("type") > 0) {
+        activation_type = activation->get_meta_data().at("type");
     }
     
     // Calculate text size and position

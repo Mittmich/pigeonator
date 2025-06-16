@@ -34,7 +34,7 @@ void VideoEventManager::run() {
         }
         // check frame queue
         if (!this->frame_queue->empty()) {
-            FrameEvent frame_event = this->frame_queue->front();
+            std::shared_ptr<FrameEvent> frame_event = this->frame_queue->front();
             for (auto &subscriber : this->subscribers) {
                 // check if subscriber is listening to the frame event
                 if (subscriber->listening_to().find(EventType::NEW_FRAME) != subscriber->listening_to().end()) {
@@ -49,11 +49,11 @@ void VideoEventManager::run() {
             continue;
         }
         // get the event from the queue
-        Event event = this->event_queue->front();
+        auto event = this->event_queue->front();
         // notify all subscribers
         for (auto &subscriber : this->subscribers) {
             // check if subscriber is listening to the event type
-            if (subscriber->listening_to().find(event.type) != subscriber->listening_to().end()) {
+            if (subscriber->listening_to().find(event->type) != subscriber->listening_to().end()) {
                 // update the subscriber
                 subscriber->notify(event);
             }
@@ -81,9 +81,9 @@ void VideoEventManager::stop() {
 
 VideoEventManager::VideoEventManager(Stream &stream) : stream(stream) {
     // create event queue
-    this->event_queue = std::make_shared<std::queue<Event>>();
+    this->event_queue = std::make_shared<std::queue<std::shared_ptr<Event>>>();
     // create frame queue
-    this->frame_queue = std::make_shared<std::queue<FrameEvent>>();
+    this->frame_queue = std::make_shared<std::queue<std::shared_ptr<FrameEvent>>>();
 }
 
 VideoEventManager::~VideoEventManager() {

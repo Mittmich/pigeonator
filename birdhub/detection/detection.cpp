@@ -21,18 +21,18 @@ std::set<EventType> Detector::listening_to() {
     return listening_events;
 }
 
-void Detector::set_event_queue(std::shared_ptr<std::queue<Event>> event_queue) {
+void Detector::set_event_queue(std::shared_ptr<std::queue<std::shared_ptr<Event>>> event_queue) {
     this->event_write_queue = event_queue;
     this->queue_registered = true;
 }
 
-void Detector::notify(Event event) {
+void Detector::notify(std::shared_ptr<Event> event) {
     // check if event is of type FrameEvent
-    if (event.type != EventType::NEW_FRAME) {
+    if (event->type != EventType::NEW_FRAME) {
         return;
     }
     // add event to read queue
-    this->event_read_queue.push(static_cast<FrameEvent&>(event));
+    this->event_read_queue.push(std::static_pointer_cast<FrameEvent>(event));
 }
 
 void Detector::start() {
@@ -68,13 +68,13 @@ void Detector::poll_read_queue() {
         return;
     }
     // get event from queue
-    FrameEvent event = this->event_read_queue.front();
+    std::shared_ptr<FrameEvent> event = this->event_read_queue.front();
     std::optional<DetectionEvent> detections = detect(event);
     // check if detections are present
     if (detections.has_value()) {
         // print detections with a nicely formatted timestamp
         std::cout << "Detections at " << detections.value().get_timestamp() << std::endl;
-        this->event_write_queue->push(detections.value());
+        this->event_write_queue->push(std::make_shared<DetectionEvent>(detections.value()));
     }
     // remove event from read queue
     this->event_read_queue.pop();
@@ -112,16 +112,16 @@ cv::Mat MotionDetector::preprocess_image(cv::Mat image) {
     return blurred;
 }
 
-std::optional<DetectionEvent> MotionDetector::detect(FrameEvent &frame_event) {
+std::optional<DetectionEvent> MotionDetector::detect(std::shared_ptr<FrameEvent> frame_event) {
     // check if frame is delayed
-    if (std::chrono::system_clock::from_time_t(frame_event.get_timestamp()) < std::chrono::system_clock::now() - max_delay) {
+    if (std::chrono::system_clock::from_time_t(frame_event->get_timestamp()) < std::chrono::system_clock::now() - max_delay) {
         return std::nullopt;
     }
     // check whether image exists
-    if (!image_store->get(frame_event.get_timestamp()).has_value()) {
+    if (!image_store->get(frame_event->get_timestamp()).has_value()) {
         return std::nullopt;
     }
-    cv::Mat current_image = image_store->get(frame_event.get_timestamp()).value();
+    cv::Mat current_image = image_store->get(frame_event->get_timestamp()).value();
     // preprocess image
     cv::Mat processed_image = preprocess_image(current_image);
     // check if previous image is empty
