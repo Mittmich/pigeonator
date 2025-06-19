@@ -576,33 +576,6 @@ TEST_CASE("EventRecorder creates detection frames for multiple timestamps") {
     cleanup_directory(temp_dir);
 }
 
-/* TEST_CASE("EventRecorder handles wrong event types gracefully") {
-    std::set<EventType> events = {EventType::NEW_FRAME, EventType::DETECTION, EventType::EFFECTOR_ACTION};
-    auto image_store = std::make_shared<ImageStore>(50);
-    std::string temp_dir = create_temp_directory();
-    
-    TestableEventRecorder recorder(events, image_store, temp_dir);
-    auto event_queue = std::make_shared<std::queue<Event>>();
-    recorder.set_event_queue(event_queue);
-    
-    time_t timestamp = std::time(nullptr);
-    
-    // Create event with wrong type for each handler
-    Event wrong_frame_event(EventType::DETECTION, timestamp, std::nullopt);
-    Event wrong_detection_event(EventType::NEW_FRAME, timestamp, std::nullopt);
-    Event wrong_effector_event(EventType::NEW_FRAME, timestamp, std::nullopt);
-    
-    // These should be handled gracefully (ignored)
-    recorder.test_handle_new_frame(wrong_frame_event);
-    recorder.test_handle_detection(wrong_detection_event);
-    recorder.test_handle_effector_action(wrong_effector_event);
-    
-    // Test passes if all calls complete without exceptions
-    CHECK(true);
-    
-    cleanup_directory(temp_dir);
-} */
-
 TEST_CASE("EventRecorder handles missing image in store gracefully") {
     std::set<EventType> events = {EventType::NEW_FRAME, EventType::DETECTION};
     auto image_store = std::make_shared<ImageStore>(50);
@@ -799,3 +772,150 @@ TEST_CASE("EventRecorder notify interface filtering") {
     
     cleanup_directory(temp_dir);
 }
+
+
+TEST_CASE("EventRecorder writes correct number of frames to recording video") {
+    std::set<EventType> events = {EventType::NEW_FRAME, EventType::DETECTION};
+    auto image_store = std::make_shared<ImageStore>(50);
+    std::string temp_dir = create_temp_directory();
+    
+    EventRecorder recorder(events, image_store, temp_dir, 10, 30, 10, 100);
+    auto event_queue = std::make_shared<std::queue<std::shared_ptr<Event>>>();
+    recorder.set_event_queue(event_queue);
+
+    Timestamp base_time = test_now();
+    std::vector<std::shared_ptr<FrameEvent>> frame_events;
+    // Create all frames upfront
+    for (int i = 0; i < 5; i++) {
+        Timestamp timestamp = test_timestamp_offset(i);
+        cv::Mat test_image = create_video_image(1080, 1920);
+        image_store->put(timestamp, test_image);
+        auto frame_event = std::make_shared<FrameEvent>(timestamp, std::nullopt);
+        frame_events.push_back(frame_event);
+    }
+
+    // Start the recorder
+    recorder.start();
+
+    // Add 2 frames to the recorder
+    for (int i = 0; i < 2; i++) {
+        recorder.notify(frame_events[i]);
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    
+    // Trigger a detection event
+    auto detection_event = std::make_shared<DetectionEvent>(create_test_detection_event(test_timestamp_offset(1)));
+    recorder.notify(detection_event);
+    
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    
+    // Add remaining frames to the recorder
+    for (int i = 2; i < 5; i++) {
+        recorder.notify(frame_events[i]);
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    // Wait for the recorder to finish writing
+    std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+    recorder.stop();
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    std::cout << "Recorder stopped, checking video frames..." << std::endl;
+    // Load frames from file to verify order
+    // Get video file path by searching temp directory
+    bool found_video_file = false;
+    std::string video_file;
+    for (const auto& entry : std::filesystem::directory_iterator(temp_dir)) {
+        if (entry.path().extension() == ".mp4" &&
+            entry.path().filename().string().find("recording_") != std::string::npos) {
+            video_file = entry.path().string();
+            found_video_file = true;
+            break;
+        }
+    }
+    // print video file path
+    std::cout << "Video file path: " << video_file << std::endl;
+    CHECK(found_video_file == true);
+    cv::VideoCapture cap(video_file);
+    CHECK(cap.isOpened());
+    std::vector<cv::Mat> video_frames;
+    cv::Mat frame;
+    while (cap.read(frame)) {
+        video_frames.push_back(frame);
+    }
+    cap.release();
+    // Check if right amount of frames were written
+    CHECK(video_frames.size() == 5);
+    cleanup_directory(temp_dir);
+}
+
+TEST_CASE("EventRecorder writes correct number of frames to detection video") {
+    std::set<EventType> events = {EventType::NEW_FRAME, EventType::DETECTION};
+    auto image_store = std::make_shared<ImageStore>(50);
+    std::string temp_dir = create_temp_directory();
+    
+    EventRecorder recorder(events, image_store, temp_dir, 10, 30, 10, 100);
+    auto event_queue = std::make_shared<std::queue<std::shared_ptr<Event>>>();
+    recorder.set_event_queue(event_queue);
+
+    Timestamp base_time = test_now();
+    std::vector<std::shared_ptr<FrameEvent>> frame_events;
+    // Create all frames upfront
+    for (int i = 0; i < 5; i++) {
+        Timestamp timestamp = test_timestamp_offset(i);
+        cv::Mat test_image = create_video_image(1080, 1920);
+        image_store->put(timestamp, test_image);
+        auto frame_event = std::make_shared<FrameEvent>(timestamp, std::nullopt);
+        frame_events.push_back(frame_event);
+    }
+
+    // Start the recorder
+    recorder.start();
+
+    // Add 2 frames to the recorder
+    for (int i = 0; i < 2; i++) {
+        recorder.notify(frame_events[i]);
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    
+    // Trigger a detection event
+    auto detection_event = std::make_shared<DetectionEvent>(create_test_detection_event(test_timestamp_offset(1)));
+    recorder.notify(detection_event);
+    
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    
+    // Add remaining frames to the recorder
+    for (int i = 2; i < 5; i++) {
+        recorder.notify(frame_events[i]);
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    // Wait for the recorder to finish writing
+    std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+    recorder.stop();
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    std::cout << "Recorder stopped, checking video frames..." << std::endl;
+    // Load frames from file to verify order
+    // Get video file path by searching temp directory
+    bool found_video_file = false;
+    std::string video_file;
+    for (const auto& entry : std::filesystem::directory_iterator(temp_dir)) {
+        if (entry.path().extension() == ".mp4" &&
+            entry.path().filename().string().find("detection_") != std::string::npos) {
+            video_file = entry.path().string();
+            found_video_file = true;
+            break;
+        }
+    }
+    // print video file path
+    std::cout << "Video file path: " << video_file << std::endl;
+    CHECK(found_video_file == true);
+    cv::VideoCapture cap(video_file);
+    CHECK(cap.isOpened());
+    std::vector<cv::Mat> video_frames;
+    cv::Mat frame;
+    while (cap.read(frame)) {
+        video_frames.push_back(frame);
+    }
+    cap.release();
+    // Check if right amount of frames were written
+    CHECK(video_frames.size() == 5);
+    cleanup_directory(temp_dir);
+}   

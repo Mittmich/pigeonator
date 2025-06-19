@@ -161,8 +161,9 @@ EventRecorder::EventRecorder(
     int fps,
     int look_back_frames,
     int detection_buffer_size
-) : Recorder(listening_events, image_store, output_directory), slack(slack), fps(fps) {
-};
+) : Recorder(listening_events, image_store, output_directory), slack(slack), fps(fps), look_back_frames(look_back_frames), detection_buffer_size(detection_buffer_size){
+    
+}
 
 EventRecorder::~EventRecorder() {
     if (running) {
@@ -227,7 +228,7 @@ FrameEvent EventRecorder::create_detection_frame(std::shared_ptr<DetectionEvent>
         cv::Mat frame = image_store->get(frame_timestamp).value();
         // Search for the detection in the detection event that matches the frame timestamp
         auto detections = detection_event->get_detections();
-        for (auto& detection : detections) { // Changed to use a reference for detection
+        for (auto& detection : detections) {
             if (detection.get_frame_event()->get_timestamp() == frame_timestamp) {
                 // Draw bounding boxes on the frame if available
                 auto bounding_boxes_opt = detection.get_bounding_boxes();
@@ -286,6 +287,11 @@ void EventRecorder::_write_detections() {
             _add_activation_overlay(detection_frame, activation, write_timestamps);
         }
     }
+    // sort the detection buffer by timestamp
+    std::sort(detection_buffer.begin(), detection_buffer.end(),
+        [](FrameEvent& a, FrameEvent& b) {
+            return a.get_timestamp() < b.get_timestamp();
+        });
     
     // Create detection video writer if not already created
     if (!detection_writer.isOpened()) {
@@ -313,14 +319,24 @@ void EventRecorder::_write_detections() {
 void EventRecorder::_update_detections(std::shared_ptr<DetectionEvent> detection_event) {
     std::vector<FrameEvent> detection_frames = this->create_detection_frames(detection_event);
     // Add the detection frames to the detection buffer
-    for (const auto& detection : detection_frames) {
-        this->detection_buffer.push_back(detection);
+    for (auto& detection : detection_frames) {
+        // add frame to the detection buffer, if it is not already present
+        auto it = std::find_if(detection_buffer.begin(), detection_buffer.end(),
+            [&detection](FrameEvent& existing_frame) {
+                return existing_frame.get_timestamp() == detection.get_timestamp();
+            });
+        if (it == detection_buffer.end()) {
+            detection_buffer.push_back(detection);
+        }
     }
 }
 
 void EventRecorder::handle_new_frame(std::shared_ptr<FrameEvent> frame_event) {
     // Check if the image exists in the image store
     if (!image_store->get(frame_event->get_timestamp()).has_value()) {
+        // log the missing image
+        std::cerr << "No image available " << std::endl;
+        // Return early if no image is available
         return; // No image available for this timestamp
     }
     cv::Mat frame = image_store->get(frame_event->get_timestamp()).value();
@@ -330,7 +346,10 @@ void EventRecorder::handle_new_frame(std::shared_ptr<FrameEvent> frame_event) {
         this->_write_detections();
     }
     if (this->_stop_recording_in > 0) {
+        //log 
+        std::cout << "Recording in progress, writing frame to video." << std::endl;
         this->video_writer.write(frame);
+        std::cout << "Frames written" << std::endl;
         this->_stop_recording_in--;
     } else if (this->video_writer.isOpened()) {
         // call update detections with empty detection event
@@ -429,4 +448,28 @@ void EventRecorder::_add_activation_overlay(FrameEvent detection_frame, std::sha
     
     // Put the modified image back to the store
     image_store->put(detection_frame.get_timestamp(), frame);
+}
+
+// Override stop method to ensure all resources are cleaned up
+void EventRecorder::stop() {
+    // log that method was called
+    std::cout << "Stopping EventRecorder." << std::endl;
+    if (running) {
+        // log
+        std::cout << "Stopping recording thread." << std::endl;
+        // Ensure all pending detections are written before stopping
+        if (this->recording) {
+            DetectionEvent empty_detection_event(now(), {}, std::nullopt);
+            this->_update_detections(std::make_shared<DetectionEvent>(empty_detection_event));
+            this->_write_detections();
+        }
+        this->running = false;
+    }
+    if (recording_thread.joinable()) {
+        recording_thread.join();
+    }
+    this->_close_video_writers();
+    this->_clear_buffers();
+    // log
+    std::cout << "EventRecorder stopped." << std::endl;
 }

@@ -76,10 +76,11 @@ public:
         int detection_buffer_size = 200
     );
     ~EventRecorder();
+    void stop() override;
 protected:
-    void handle_new_frame(std::shared_ptr<FrameEvent> frame_event);
-    void handle_detection(std::shared_ptr<DetectionEvent> detection_event);
-    void handle_effector_action(std::shared_ptr<Event> effector_event);
+    void handle_new_frame(std::shared_ptr<FrameEvent> frame_event) override;
+    void handle_detection(std::shared_ptr<DetectionEvent> detection_event) override;
+    void handle_effector_action(std::shared_ptr<Event> effector_event) override;
     void _update_buffers(std::shared_ptr<FrameEvent> frame_event);
     void _write_detections();
     void _clear_buffers();
