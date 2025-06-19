@@ -86,8 +86,8 @@ protected:
     void _close_video_writers();
     void _update_detections(std::shared_ptr<DetectionEvent> detection_event);
     std::vector<FrameEvent> create_detection_frames(std::shared_ptr<DetectionEvent> detection_event);
-    FrameEvent create_detection_frame(std::shared_ptr<DetectionEvent> detection_event, time_t frame_timestamp);
-    void _add_activation_overlay(FrameEvent detection_frame, std::shared_ptr<Event> activation, const std::vector<time_t>& write_timestamps);
+    FrameEvent create_detection_frame(std::shared_ptr<DetectionEvent> detection_event, Timestamp frame_timestamp);
+    void _add_activation_overlay(FrameEvent detection_frame, std::shared_ptr<Event> activation, const std::vector<Timestamp>& write_timestamps);
     // Additional parameters for event recording
     int slack; // Number of frames wait until stop recording
     int fps; // frames per second for the video
@@ -103,8 +103,8 @@ protected:
     // Buffer for effector actions
     std::deque<std::shared_ptr<Event>> effector_buffer;
     // Buffer for video frames
-    std::deque<time_t> video_buffer;
-    std::deque<time_t> detection_video_buffer;;
+    std::deque<Timestamp> video_buffer;
+    std::deque<Timestamp> detection_video_buffer;
     // recording start time
     std::chrono::time_point<std::chrono::steady_clock> recording_start_time;
 };

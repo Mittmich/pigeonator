@@ -73,7 +73,8 @@ void Detector::poll_read_queue() {
     // check if detections are present
     if (detections.has_value()) {
         // print detections with a nicely formatted timestamp
-        std::cout << "Detections at " << detections.value().get_timestamp() << std::endl;
+        auto timestamp_ms = std::chrono::duration_cast<std::chrono::milliseconds>(detections.value().get_timestamp().time_since_epoch()).count();
+        std::cout << "Detections at " << timestamp_ms << "ms since epoch" << std::endl;
         this->event_write_queue->push(std::make_shared<DetectionEvent>(detections.value()));
     }
     // remove event from read queue
@@ -114,7 +115,7 @@ cv::Mat MotionDetector::preprocess_image(cv::Mat image) {
 
 std::optional<DetectionEvent> MotionDetector::detect(std::shared_ptr<FrameEvent> frame_event) {
     // check if frame is delayed
-    if (std::chrono::system_clock::from_time_t(frame_event->get_timestamp()) < std::chrono::system_clock::now() - max_delay) {
+    if (frame_event->get_timestamp() < std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now()) - max_delay) {
         return std::nullopt;
     }
     // check whether image exists
@@ -172,7 +173,7 @@ std::optional<DetectionEvent> MotionDetector::detect(std::shared_ptr<FrameEvent>
         std::map<std::string, std::string> meta_data;
         meta_data["type"] = std::string("motion");
         Detection detection(
-            time(nullptr),
+            now(),
             frame_event,
             labels,
             confidences,
@@ -189,7 +190,7 @@ std::optional<DetectionEvent> MotionDetector::detect(std::shared_ptr<FrameEvent>
         }else{
             // added detections to event queue
             DetectionEvent detection_event(
-                time(nullptr),
+                now(),
                 detections
             );
             detections.clear();

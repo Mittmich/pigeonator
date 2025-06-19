@@ -4,6 +4,7 @@
 #include <queue>
 #include <set>
 #include <thread>
+#include "timestamp_utils.hpp"
 #include "test_utils.hpp"
 
 TEST_CASE("VideoEventManager - Add subscriber") {
@@ -67,7 +68,7 @@ TEST_CASE("VideoEventManager - Frame event propagation") {
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
     
     // Simulate frame
-    auto frame = std::make_shared<FrameEvent>(std::time(nullptr), std::nullopt);
+    auto frame = std::make_shared<FrameEvent>(test_now(), std::nullopt);
     stream.simulate_frame(frame);
     
     // Allow time for processing
@@ -103,9 +104,9 @@ TEST_CASE("VideoEventManager - Event propagation") {
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
     
     // Push event to queue
-    auto frame_event = std::make_shared<FrameEvent>(std::time(nullptr), std::nullopt);
-    Detection detection(std::time(nullptr), frame_event, std::nullopt);
-    auto event = std::make_shared<DetectionEvent>(std::time(nullptr), std::vector<Detection>{detection}, std::nullopt);
+    auto frame_event = std::make_shared<FrameEvent>(test_now(), std::nullopt);
+    Detection detection(test_now(), frame_event, std::nullopt);
+    auto event = std::make_shared<DetectionEvent>(test_now(), std::vector<Detection>{detection}, std::nullopt);
     writer->simulate_event(event);
     
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -144,9 +145,9 @@ TEST_CASE("VideoEventManager - Multiple subscribers") {
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
     
     // Push event to queue
-    auto frame_event = std::make_shared<FrameEvent>(std::time(nullptr), std::nullopt);
-    Detection detection(std::time(nullptr), frame_event, std::nullopt);
-    auto event = std::make_shared<DetectionEvent>(std::time(nullptr), std::vector<Detection>{detection}, std::nullopt);
+    auto frame_event = std::make_shared<FrameEvent>(test_now(), std::nullopt);
+    Detection detection(test_now(), frame_event, std::nullopt);
+    auto event = std::make_shared<DetectionEvent>(test_now(), std::vector<Detection>{detection}, std::nullopt);
     writer->simulate_event(event);
     
     std::this_thread::sleep_for(std::chrono::milliseconds(100));

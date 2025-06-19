@@ -26,16 +26,25 @@ int main() {
         20,
         21,
         5,
-        200,
-        0,
+        2500,
+        1,
         std::chrono::seconds(5)
     );
-    // instnatice continuous recorder
-    auto recorder = std::make_shared<ContinuousRecorder>(
+    // instantiate event recorder
+    auto recorder = std::make_shared<EventRecorder>(
+        std::set<EventType>({EventType::NEW_FRAME, EventType::DETECTION}),
+        image_store,
+        "recordings",
+        150,
+        30, 
+        30,
+        150
+    );
+/*     auto recorder = std::make_shared<ContinuousRecorder>(
         std::set<EventType>({EventType::NEW_FRAME}),
         image_store,
         "recordings"
-    );
+    ); */
     // instantiate event manager
     auto manager = VideoEventManager(stream);
     manager.add_subscriber(motion_detector);

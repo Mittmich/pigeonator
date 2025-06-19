@@ -221,7 +221,7 @@ std::vector<FrameEvent> EventRecorder::create_detection_frames(std::shared_ptr<D
     return detection_frames;
 }
 
-FrameEvent EventRecorder::create_detection_frame(std::shared_ptr<DetectionEvent>  detection_event, time_t frame_timestamp) {
+FrameEvent EventRecorder::create_detection_frame(std::shared_ptr<DetectionEvent>  detection_event, Timestamp frame_timestamp) {
     // Retrive the image from the image store
     if (image_store->get(frame_timestamp).has_value()) {
         cv::Mat frame = image_store->get(frame_timestamp).value();
@@ -273,9 +273,9 @@ void EventRecorder::_write_detections() {
     // Add all activations that are recorded to the detections
     for (auto& activation : effector_buffer) {
         // Find detections within 2 seconds of the activation
-        std::vector<time_t> write_timestamps;
+        std::vector<Timestamp> write_timestamps;
         for (auto& detection : detection_buffer) {
-            auto time_diff = std::abs(static_cast<long>(detection.get_timestamp() - activation->get_timestamp()));
+            auto time_diff = std::abs(std::chrono::duration_cast<std::chrono::seconds>(detection.get_timestamp() - activation->get_timestamp()).count());
             if (time_diff < 2) { // Within 2 seconds
                 write_timestamps.push_back(detection.get_timestamp());
             }
@@ -334,6 +334,9 @@ void EventRecorder::handle_new_frame(std::shared_ptr<FrameEvent> frame_event) {
         this->_stop_recording_in--;
     } else if (this->video_writer.isOpened()) {
         // call update detections with empty detection event
+        // Log the end of recording
+        std::cout << "Stopping recording."  << std::endl;
+        // Create an empty detection event to signal the end of recording
         DetectionEvent empty_detection_event(frame_event->get_timestamp(), {}, std::nullopt);
         this->_update_detections(std::make_shared<DetectionEvent>(empty_detection_event));
         this->_write_detections();
@@ -356,6 +359,9 @@ void EventRecorder::handle_detection(std::shared_ptr<DetectionEvent> detection_e
         this->recording_start_time = std::chrono::steady_clock::now();
         // Create a video writer if not already created
         if (!video_writer.isOpened()) {
+            // log the start of recording
+            std::cout << "Starting recording." << std::endl;
+            // Create a video writer with a filename in the specified
             std::string filename = "recording_" + std::to_string(std::time(nullptr)) + ".mp4";
             std::filesystem::path full_path = std::filesystem::path(output_directory) / filename;
             video_writer.open(full_path.string(), cv::VideoWriter::fourcc('m', 'p', '4', 'v'), this->fps, this->frame_size, true);
@@ -381,10 +387,10 @@ void EventRecorder::handle_effector_action(std::shared_ptr<Event> effector_event
     effector_buffer.push_back(effector_event);
 }
 
-void EventRecorder::_add_activation_overlay(FrameEvent detection_frame, std::shared_ptr<Event> activation, const std::vector<time_t>& write_timestamps) {
+void EventRecorder::_add_activation_overlay(FrameEvent detection_frame, std::shared_ptr<Event> activation, const std::vector<Timestamp>& write_timestamps) {
     // Check if this frame's timestamp is in the write_timestamps list
     bool should_write = false;
-    for (time_t timestamp : write_timestamps) {
+    for (Timestamp timestamp : write_timestamps) {
         if (detection_frame.get_timestamp() == timestamp) {
             should_write = true;
             break;

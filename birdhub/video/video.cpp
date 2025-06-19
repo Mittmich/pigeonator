@@ -243,7 +243,7 @@ void Stream::enque_frame_token() {
     if (frame.empty()) {
         return;
     }
-    std::time_t timestamp = std::time(0);
+    Timestamp timestamp = now();
     FrameEvent frame_event = FrameEvent(timestamp, std::nullopt);
     image_store->put(timestamp, frame);
     this->frame_queue->push(std::make_shared<FrameEvent>(frame_event));

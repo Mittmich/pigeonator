@@ -6,13 +6,21 @@
 #include <map>
 #include <queue>
 #include <optional>
-#include <ctime>
+#include <chrono>
 #include <memory>
 #include <opencv2/opencv.hpp>
 #include <string>
 
 #ifndef BIRDHUB_EVENTS_EVENTS_HPP
 #define BIRDHUB_EVENTS_EVENTS_HPP
+
+// Define timestamp type with millisecond precision
+using Timestamp = std::chrono::time_point<std::chrono::system_clock, std::chrono::milliseconds>;
+
+// Helper function to get current timestamp
+inline Timestamp now() {
+    return std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now());
+}
 
 // create enum for event types
 
@@ -27,15 +35,15 @@ enum class EventType {
 class Event {
 public:
     Event(EventType type,
-         time_t event_timestamp,
+         Timestamp event_timestamp,
          std::optional<std::map<std::string,
          std::string>> meta_data);
     ~Event();
     EventType type;
-    time_t get_timestamp();
+    Timestamp get_timestamp();
     std::map<std::string, std::string> get_meta_data();
 protected:
-    time_t event_timestamp;
+    Timestamp event_timestamp;
     std::optional<std::map<std::string, std::string>> meta_data;  
 };
 
@@ -44,7 +52,7 @@ protected:
 class FrameEvent : public Event {
 public:
     FrameEvent(
-         time_t event_timestamp,
+         Timestamp event_timestamp,
          std::optional<std::map<std::string,
          std::string>> meta_data);
     ~FrameEvent();
@@ -68,7 +76,7 @@ public:
 class Detection {
     public:
     Detection(
-         time_t timestamp,
+         Timestamp timestamp,
          std::shared_ptr<FrameEvent> frame_event,
          std::optional<std::vector<std::string>> labels = std::nullopt,
          std::optional<std::vector<float>> confidences = std::nullopt,
@@ -76,7 +84,7 @@ class Detection {
          std::optional<std::vector<int>> detection_areas = std::nullopt,
          std::optional<std::map<std::string, std::string>> meta_data = std::nullopt);
     ~Detection();
-    time_t get_timestamp();
+    Timestamp get_timestamp();
     std::shared_ptr<FrameEvent> get_frame_event();
     std::optional<std::vector<std::string>> get_labels();
     std::optional<std::vector<float>> get_confidences();
@@ -84,7 +92,7 @@ class Detection {
     std::optional<std::vector<int>> get_detection_areas();
     std::optional<std::map<std::string, std::string>> get_meta_data();
 private:
-    time_t timestamp;
+    Timestamp timestamp;
     std::shared_ptr<FrameEvent> frame_event;
     std::optional<std::vector<std::string>> labels;
     std::optional<std::vector<float>> confidences;
@@ -98,7 +106,7 @@ private:
 class DetectionEvent : public Event {
 public:
     DetectionEvent(
-         time_t event_timestamp,
+         Timestamp event_timestamp,
          std::vector<Detection> detections,
          std::optional<std::map<std::string, std::string>> meta_data = std::nullopt);
     ~DetectionEvent();

@@ -15,7 +15,7 @@ ImageStore::ImageStore(int size)
     this->size = size;
 }
 
-void ImageStore::put(std::time_t timestamp, cv::Mat &image)
+void ImageStore::put(Timestamp timestamp, cv::Mat &image)
 {
     // check if image is empty
     if (image.empty())
@@ -26,7 +26,7 @@ void ImageStore::put(std::time_t timestamp, cv::Mat &image)
     if (this->timestamp_queue.size() >= this->size)
     {
         // get front element from queue and delete it from map
-        std::time_t front = this->timestamp_queue.front();
+        Timestamp front = this->timestamp_queue.front();
         this->image_map.erase(front);
         // delete front element from queue
         this->timestamp_queue.pop_front();
@@ -35,7 +35,7 @@ void ImageStore::put(std::time_t timestamp, cv::Mat &image)
     this->image_map[timestamp] = image;
 }
 
-std::optional<cv::Mat> ImageStore::get(std::time_t timestamp)
+std::optional<cv::Mat> ImageStore::get(Timestamp timestamp)
 {
     // check if timestamp is in store
     if (this->image_map.count(timestamp) == 0)

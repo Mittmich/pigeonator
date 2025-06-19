@@ -6,13 +6,13 @@
 
 Event::Event(
     EventType type,
-    time_t event_timestamp,
+    Timestamp event_timestamp,
     std::optional<std::map<std::string, std::string>> meta_data)
     : type(type), event_timestamp(event_timestamp), meta_data(meta_data) {}
 
 Event::~Event() = default;
 
-time_t Event::get_timestamp()
+Timestamp Event::get_timestamp()
 {
     return event_timestamp;
 }
@@ -27,14 +27,14 @@ std::map<std::string, std::string> Event::get_meta_data()
 }
 
 FrameEvent::FrameEvent(
-    time_t event_timestamp,
+    Timestamp event_timestamp,
     std::optional<std::map<std::string, std::string>> meta_data)
     : Event(EventType::NEW_FRAME, event_timestamp, meta_data) {}
 
 FrameEvent::~FrameEvent() = default;
 
 DetectionEvent::DetectionEvent(
-    time_t event_timestamp,
+    Timestamp event_timestamp,
     std::vector<Detection> detections,
     std::optional<std::map<std::string, std::string>> meta_data)
     : Event(EventType::DETECTION, event_timestamp, meta_data),
@@ -48,7 +48,7 @@ std::vector<Detection> DetectionEvent::get_detections()
 }
 
 Detection::Detection(
-    time_t timestamp,
+    Timestamp timestamp,
     std::shared_ptr<FrameEvent> frame_event,
     std::optional<std::vector<std::string>> labels,
     std::optional<std::vector<float>> confidences,
@@ -89,5 +89,15 @@ std::optional<std::vector<cv::Rect>> Detection::get_bounding_boxes()
 std::optional<std::vector<int>> Detection::get_detection_areas()
 {
     return detection_areas;
+}
+
+Timestamp Detection::get_timestamp()
+{
+    return timestamp;
+}
+
+std::optional<std::map<std::string, std::string>> Detection::get_meta_data()
+{
+    return meta_data;
 }
 

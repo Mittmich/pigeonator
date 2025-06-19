@@ -1,6 +1,7 @@
 #include "doctest/doctest.h"
 #include "detection.hpp"
 #include "events.hpp"
+#include "timestamp_utils.hpp"
 #include <opencv2/opencv.hpp>
 
 
@@ -19,7 +20,7 @@ TEST_CASE("MotionDetector - No motion detected for single fame.") {
     MotionDetector detector(store, 20, 3, 3, 50, 0, std::chrono::seconds(5));
     
     cv::Mat img = create_test_image(100, 100, 128);
-    time_t t1 = std::time(nullptr);
+    Timestamp t1 = test_now();
     store->put(t1, img);
     
     auto event = std::make_shared<FrameEvent>(t1, std::nullopt);
@@ -32,11 +33,11 @@ TEST_CASE("MotionDetector - No motion detected for identical frames.") {
     MotionDetector detector(store, 20, 3, 3, 50, 0, std::chrono::seconds(5));
     
     cv::Mat img1 = create_test_image(100, 100, 128);
-    time_t t1 = std::time(nullptr);
+    Timestamp t1 = test_now();
     store->put(t1, img1);
 
     cv::Mat img2 = create_test_image(100,100,128);
-    time_t t2 = t1 + 2;
+    Timestamp t2 = t1 + std::chrono::seconds(2);
     store->put(t2, img2);
 
     auto event1 = std::make_shared<FrameEvent>(t1, std::nullopt);
@@ -53,14 +54,14 @@ TEST_CASE("MotionDetector - Motion detected between different frames") {
     
     // First frame
     cv::Mat img1 = create_test_image(100, 100, 0);
-    time_t t1 = std::time(nullptr);
+    Timestamp t1 = test_now();
     store->put(t1, img1);
     auto event1 = std::make_shared<FrameEvent>(t1, std::nullopt);
     detector.detect(event1);
     
     // Second frame with motion
     cv::Mat img2 = create_test_image(100, 100, 255);
-    time_t t2 = t1 + 1;
+    Timestamp t2 = t1 + std::chrono::seconds(1);
     store->put(t2, img2);
     auto event2 = std::make_shared<FrameEvent>(t2, std::nullopt);
     auto result = detector.detect(event2);
@@ -77,20 +78,20 @@ TEST_CASE("MotionDetector - Respects activation frames threshold") {
     cv::Mat img3 = create_test_image(100,100,50);
     
     // First frame
-    time_t t1 = std::time(nullptr);
+    Timestamp t1 = test_now();
     store->put(t1, img1);
     auto event1 = std::make_shared<FrameEvent>(t1, std::nullopt);
     detector.detect(event1);
 
     // second frame
-    time_t t2 = t1 + 1;
+    Timestamp t2 = t1 + std::chrono::seconds(1);
     store->put(t2, img2);
     auto event2 = std::make_shared<FrameEvent>(t2, std::nullopt);
     auto result = detector.detect(event2);
     CHECK(!result.has_value());
 
     // third frame -> should trigger
-    time_t t3 = t1 + 2;
+    Timestamp t3 = t1 + std::chrono::seconds(2);
     store->put(t3, img3);
     auto event3 = std::make_shared<FrameEvent>(t3, std::nullopt);
     auto result2 = detector.detect(event3);
@@ -107,21 +108,21 @@ TEST_CASE("MotionDetector - Respects max delay threshold") {
     cv::Mat img3 = create_test_image(100,100,50);
     
     // Set up initial frame
-    time_t current_time = std::time(nullptr);
-    time_t t1 = current_time - 2; // Within threshold
+    Timestamp current_time = test_now();
+    Timestamp t1 = current_time - std::chrono::seconds(2); // Within threshold
     store->put(t1, img1);
     auto event1 = std::make_shared<FrameEvent>(t1, std::nullopt);
     detector.detect(event1);
 
     // Test frame within delay threshold
-    time_t t2 = current_time - 1;
+    Timestamp t2 = current_time - std::chrono::seconds(1);
     store->put(t2, img2);
     auto event2 = std::make_shared<FrameEvent>(t2, std::nullopt);
     auto result1 = detector.detect(event2);
     CHECK(result1.has_value());
 
     // Test frame outside delay threshold
-    time_t t3 = current_time - 10; // Outside threshold
+    Timestamp t3 = current_time - std::chrono::seconds(10); // Outside threshold
     store->put(t3, img3);
     auto event3 = std::make_shared<FrameEvent>(t3, std::nullopt);
     auto result2 = detector.detect(event3);
@@ -141,13 +142,13 @@ TEST_CASE("MotionDetector - Integration test with event queue") {
     cv::Mat img2 = create_test_image(100, 100, 255);
     
     // Push first frame
-    time_t t1 = std::time(nullptr);
+    Timestamp t1 = test_now();
     store->put(t1, img1);
     auto event1 = std::make_shared<FrameEvent>(t1, std::nullopt);
     detector.notify(event1);
     
     // Push second frame with motion
-    time_t t2 = t1 + 1;
+    Timestamp t2 = t1 + std::chrono::seconds(1);
     store->put(t2, img2);
     auto event2 = std::make_shared<FrameEvent>(t2, std::nullopt);
     detector.notify(event2);
