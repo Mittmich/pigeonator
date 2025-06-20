@@ -38,7 +38,7 @@ int main() {
         150,
         30, 
         200,
-        150
+        100
     );
 /*     auto recorder = std::make_shared<ContinuousRecorder>(
         std::set<EventType>({EventType::NEW_FRAME}),

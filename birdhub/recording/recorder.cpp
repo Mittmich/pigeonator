@@ -344,12 +344,10 @@ void EventRecorder::handle_new_frame(std::shared_ptr<FrameEvent> frame_event) {
     // Check  whether we should write detections to video
     if (this->detection_buffer.size() > this->detection_buffer_size) {
         this->_write_detections();
+        this->detection_video_buffer.clear();
     }
     if (this->_stop_recording_in > 0) {
-        //log 
-        std::cout << "Recording in progress, writing frame to video." << std::endl;
         this->video_writer.write(frame);
-        std::cout << "Frames written" << std::endl;
         this->_stop_recording_in--;
     } else if (this->video_writer.isOpened()) {
         // call update detections with empty detection event
@@ -452,12 +450,7 @@ void EventRecorder::_add_activation_overlay(FrameEvent detection_frame, std::sha
 
 // Override stop method to ensure all resources are cleaned up
 void EventRecorder::stop() {
-    // log that method was called
-    std::cout << "Stopping EventRecorder." << std::endl;
     if (running) {
-        // log
-        std::cout << "Stopping recording thread." << std::endl;
-        // Ensure all pending detections are written before stopping
         if (this->recording) {
             DetectionEvent empty_detection_event(now(), {}, std::nullopt);
             this->_update_detections(std::make_shared<DetectionEvent>(empty_detection_event));
