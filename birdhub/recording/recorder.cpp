@@ -180,10 +180,6 @@ void EventRecorder::_update_buffers(std::shared_ptr<FrameEvent> frame_event) {
     if (video_buffer.size() > look_back_frames) {
         video_buffer.pop_front();
     }
-    // Same for detection video buffer
-    if (detection_video_buffer.size() > this->slack) {
-        detection_video_buffer.pop_front();
-    }
 }
 
 void EventRecorder::_clear_buffers() {
@@ -343,6 +339,11 @@ void EventRecorder::handle_new_frame(std::shared_ptr<FrameEvent> frame_event) {
     this->_update_buffers(frame_event);
     // Check  whether we should write detections to video
     if (this->detection_buffer.size() > this->detection_buffer_size) {
+        // create empty detection event to populate buffers
+        //DetectionEvent empty_detection_event(frame_event->get_timestamp(), {}, std::nullopt);
+        //this->_update_detections(std::make_shared<DetectionEvent>(empty_detection_event));
+        // log
+        std::cout << "Writing detections to video." << std::endl;
         this->_write_detections();
         this->detection_video_buffer.clear();
     }

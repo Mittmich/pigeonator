@@ -37,7 +37,7 @@ int main() {
         "recordings",
         150,
         30, 
-        200,
+        150,
         100
     );
 /*     auto recorder = std::make_shared<ContinuousRecorder>(
