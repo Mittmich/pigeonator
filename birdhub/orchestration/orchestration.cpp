@@ -107,5 +107,5 @@ void VideoEventManager::signal_handler(int signal) {
     std::cout << "\nReceived signal " << signal << ", initiating graceful shutdown..." << std::endl;
     g_shutdown_requested = true;
     // wait for a short time to allow the event manager to stop gracefully
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 }

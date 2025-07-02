@@ -372,7 +372,6 @@ void EventRecorder::handle_detection(std::shared_ptr<DetectionEvent> detection_e
         video_buffer.clear();
     } else {
         // Start recording if not already recording
-        this->recording = true;
         this->_stop_recording_in = this->slack;
         this->recording_start_time = std::chrono::steady_clock::now();
         // Create a video writer if not already created
@@ -395,8 +394,9 @@ void EventRecorder::handle_detection(std::shared_ptr<DetectionEvent> detection_e
             }
         }
         // clear look back frames buffer
-        video_buffer.clear();
         this->_update_detections(detection_event);
+        video_buffer.clear();
+        this->recording = true;
     }
 }
 

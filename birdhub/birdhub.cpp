@@ -26,7 +26,7 @@ int main() {
         20,
         21,
         5,
-        2500,
+        1000,
         1,
         std::chrono::seconds(5)
     );
