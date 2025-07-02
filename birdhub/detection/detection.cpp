@@ -205,3 +205,228 @@ std::optional<DetectionEvent> MotionDetector::detect(std::shared_ptr<FrameEvent>
         return std::nullopt;
     }
 }
+
+// BirdDetectorYolov5 implementation
+
+BirdDetectorYolov5::BirdDetectorYolov5(
+    std::shared_ptr<ImageStore> image_store,
+    const std::string& model_path,
+    cv::Size image_size,
+    float confidence_threshold,
+    float iou_threshold,
+    std::chrono::seconds max_delay,
+    int threshold_area
+) : Detector({EventType::NEW_FRAME}, image_store),
+    model_path(model_path),
+    image_size(image_size),
+    confidence_threshold(confidence_threshold),
+    iou_threshold(iou_threshold),
+    max_delay(max_delay),
+    threshold_area(threshold_area),
+    model_loaded(false) {
+    
+    // Initialize class names for bird detection
+    // These would typically be loaded from the model metadata or a separate file
+    class_names = {
+        "bird", "pigeon", "crow", "sparrow", "robin", "eagle", "hawk", "seagull",
+        "duck", "goose", "swan", "heron", "owl", "woodpecker", "cardinal", "bluejay"
+    };
+    
+    load_model();
+}
+
+BirdDetectorYolov5::~BirdDetectorYolov5() = default;
+
+void BirdDetectorYolov5::load_model() {
+    try {
+        net = cv::dnn::readNetFromONNX(model_path);
+        if (net.empty()) {
+            throw std::runtime_error("Failed to load ONNX model from: " + model_path);
+        }
+        
+        // Use GPU if available
+        if (cv::dnn::DNN_BACKEND_CUDA) {
+            net.setPreferableBackend(cv::dnn::DNN_BACKEND_CUDA);
+            net.setPreferableTarget(cv::dnn::DNN_TARGET_CUDA);
+        } else {
+            net.setPreferableBackend(cv::dnn::DNN_BACKEND_OPENCV);
+            net.setPreferableTarget(cv::dnn::DNN_TARGET_CPU);
+        }
+        
+        model_loaded = true;
+        std::cout << "YOLOv5 model loaded successfully from: " << model_path << std::endl;
+    } catch (const cv::Exception& e) {
+        std::cerr << "Error loading YOLOv5 model: " << e.what() << std::endl;
+        model_loaded = false;
+    }
+}
+
+cv::Mat BirdDetectorYolov5::preprocess_image(const cv::Mat& image) {
+    cv::Mat resized;
+    cv::resize(image, resized, image_size);
+    
+    // Convert BGR to RGB
+    cv::Mat rgb;
+    cv::cvtColor(resized, rgb, cv::COLOR_BGR2RGB);
+    
+    // Create blob from image
+    cv::Mat blob;
+    cv::dnn::blobFromImage(rgb, blob, 1.0/255.0, image_size, cv::Scalar(0,0,0), true, false, CV_32F);
+    
+    return blob;
+}
+
+std::vector<cv::Rect> BirdDetectorYolov5::extract_boxes(const std::vector<cv::Mat>& outputs, 
+                                                        const cv::Size& original_size,
+                                                        std::vector<float>& confidences, 
+                                                        std::vector<int>& class_ids) {
+    std::vector<cv::Rect> boxes;
+    confidences.clear();
+    class_ids.clear();
+    
+    for (const auto& output : outputs) {
+        const float* data = (float*)output.data;
+        
+        for (int i = 0; i < output.rows; ++i) {
+            float confidence = data[4];
+            if (confidence >= confidence_threshold) {
+                // Extract class scores
+                cv::Mat scores = output.row(i).colRange(5, output.cols);
+                cv::Point class_id_point;
+                double max_class_score;
+                cv::minMaxLoc(scores, 0, &max_class_score, 0, &class_id_point);
+                
+                if (max_class_score > confidence_threshold) {
+                    // Extract bounding box
+                    float center_x = data[0];
+                    float center_y = data[1];
+                    float width = data[2];
+                    float height = data[3];
+                    
+                    int left = static_cast<int>((center_x - width / 2) * original_size.width / image_size.width);
+                    int top = static_cast<int>((center_y - height / 2) * original_size.height / image_size.height);
+                    int w = static_cast<int>(width * original_size.width / image_size.width);
+                    int h = static_cast<int>(height * original_size.height / image_size.height);
+                    
+                    cv::Rect box(left, top, w, h);
+                    int area = box.area();
+                    
+                    if (area > threshold_area) {
+                        boxes.push_back(box);
+                        confidences.push_back(static_cast<float>(max_class_score));
+                        class_ids.push_back(class_id_point.x);
+                    }
+                }
+            }
+            data += output.cols;
+        }
+    }
+    
+    return boxes;
+}
+
+void BirdDetectorYolov5::apply_nms(std::vector<cv::Rect>& boxes, 
+                                  std::vector<float>& confidences, 
+                                  std::vector<int>& class_ids) {
+    std::vector<int> indices;
+    cv::dnn::NMSBoxes(boxes, confidences, confidence_threshold, iou_threshold, indices);
+    
+    std::vector<cv::Rect> nms_boxes;
+    std::vector<float> nms_confidences;
+    std::vector<int> nms_class_ids;
+    
+    for (int idx : indices) {
+        nms_boxes.push_back(boxes[idx]);
+        nms_confidences.push_back(confidences[idx]);
+        nms_class_ids.push_back(class_ids[idx]);
+    }
+    
+    boxes = nms_boxes;
+    confidences = nms_confidences;
+    class_ids = nms_class_ids;
+}
+
+std::optional<DetectionEvent> BirdDetectorYolov5::detect(std::shared_ptr<FrameEvent> frame_event) {
+    if (!model_loaded) {
+        std::cerr << "YOLOv5 model not loaded" << std::endl;
+        return std::nullopt;
+    }
+    
+    // Check if frame is delayed
+    if (frame_event->get_timestamp() < std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now()) - max_delay) {
+        return std::nullopt;
+    }
+    
+    // Check whether image exists
+    if (!image_store->get(frame_event->get_timestamp()).has_value()) {
+        return std::nullopt;
+    }
+    
+    cv::Mat image = image_store->get(frame_event->get_timestamp()).value();
+    cv::Size original_size = image.size();
+    
+    // Preprocess image
+    cv::Mat blob = preprocess_image(image);
+    
+    // Set input to the network
+    net.setInput(blob);
+    
+    // Run inference
+    std::vector<cv::Mat> outputs;
+    net.forward(outputs, net.getUnconnectedOutLayersNames());
+    
+    // Extract detections
+    std::vector<float> confidences;
+    std::vector<int> class_ids;
+    std::vector<cv::Rect> boxes = extract_boxes(outputs, original_size, confidences, class_ids);
+    
+    if (boxes.empty()) {
+        return std::nullopt;
+    }
+    
+    // Apply Non-Maximum Suppression
+    apply_nms(boxes, confidences, class_ids);
+    
+    if (boxes.empty()) {
+        return std::nullopt;
+    }
+    
+    // Create labels from class IDs
+    std::vector<std::string> labels;
+    for (int class_id : class_ids) {
+        if (class_id < static_cast<int>(class_names.size())) {
+            labels.push_back(class_names[class_id]);
+        } else {
+            labels.push_back("bird"); // fallback to generic "bird" label
+        }
+    }
+    
+    // Calculate detection areas
+    std::vector<int> detection_areas;
+    for (const cv::Rect& box : boxes) {
+        detection_areas.push_back(box.area());
+    }
+    
+    // Create metadata
+    std::map<std::string, std::string> meta_data;
+    meta_data["type"] = "bird_detected";
+    
+    // Create detection
+    Detection detection(
+        now(),
+        frame_event,
+        labels,
+        confidences,
+        boxes,
+        detection_areas,
+        meta_data
+    );
+    
+    // Create detection event
+    DetectionEvent detection_event(
+        now(),
+        {detection}
+    );
+    
+    return detection_event;
+}
