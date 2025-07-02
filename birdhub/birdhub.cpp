@@ -18,7 +18,7 @@ int main() {
     OpenCVCameraCapture camera(0); // Use default camera
 #endif
     // instantiate image store
-    auto image_store = std::make_shared<ImageStore>(1000);
+    auto image_store = std::make_shared<ImageStore>(5000);
     auto stream = Stream(image_store, &camera);
     // instantiate motion detector
     auto motion_detector = std::make_shared<MotionDetector>(

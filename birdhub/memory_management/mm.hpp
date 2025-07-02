@@ -6,7 +6,7 @@
 // Use the same timestamp type as events
 using Timestamp = std::chrono::time_point<std::chrono::system_clock, std::chrono::milliseconds>;
 
-const int MAX_IMAGE_STORE_SIZE = 1000;
+const int MAX_IMAGE_STORE_SIZE = 5000;
 
 class ImageStore
 /*
