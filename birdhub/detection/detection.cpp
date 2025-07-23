@@ -1,6 +1,9 @@
 #include "detection.hpp"
 #include <string>
 #include <iostream>
+#include <fstream>
+#include <sstream>
+#include <map>
 
 Detector::Detector(
     std::set<EventType> listening_events,
@@ -225,13 +228,6 @@ BirdDetectorYolov5::BirdDetectorYolov5(
     threshold_area(threshold_area),
     model_loaded(false) {
     
-    // Initialize class names for bird detection
-    // These would typically be loaded from the model metadata or a separate file
-    class_names = {
-        "bird", "pigeon", "crow", "sparrow", "robin", "eagle", "hawk", "seagull",
-        "duck", "goose", "swan", "heron", "owl", "woodpecker", "cardinal", "bluejay"
-    };
-    
     load_model();
 }
 
@@ -255,9 +251,76 @@ void BirdDetectorYolov5::load_model() {
         
         model_loaded = true;
         std::cout << "YOLOv5 model loaded successfully from: " << model_path << std::endl;
+        
+        // Try to load class names from model metadata
+        load_class_names_from_model();
+        
     } catch (const cv::Exception& e) {
         std::cerr << "Error loading YOLOv5 model: " << e.what() << std::endl;
         model_loaded = false;
+    }
+}
+
+std::vector<std::string> BirdDetectorYolov5::get_default_class_names() {
+    // Default class names for bird detection
+    return {
+        "bird", "pigeon", "crow", "sparrow", "robin", "eagle", "hawk", "seagull",
+        "duck", "goose", "swan", "heron", "owl", "woodpecker", "cardinal", "bluejay"
+    };
+}
+
+void BirdDetectorYolov5::load_class_names_from_model() {
+    // First, set default class names as fallback
+    class_names = get_default_class_names();
+    
+    try {
+        // Try to load class names from a text file alongside the model
+        std::string txt_path = model_path;
+        
+        // Replace .onnx extension with _classes.txt
+        size_t dot_pos = txt_path.find_last_of('.');
+        if (dot_pos != std::string::npos) {
+            txt_path = txt_path.substr(0, dot_pos) + "_classes.txt";
+        } else {
+            txt_path += "_classes.txt";
+        }
+        
+        std::ifstream txt_file(txt_path);
+        if (!txt_file.is_open()) {
+            std::cout << "No class names file found at: " << txt_path << std::endl;
+            std::cout << "Using default class names." << std::endl;
+            return;
+        }
+        
+        // Read class names line by line
+        std::vector<std::string> extracted_names;
+        std::string line;
+        
+        while (std::getline(txt_file, line)) {
+            // Remove trailing whitespace and carriage returns
+            line.erase(line.find_last_not_of(" \t\n\r") + 1);
+            
+            if (!line.empty()) {
+                extracted_names.push_back(line);
+            }
+        }
+        
+        txt_file.close();
+        
+        if (!extracted_names.empty()) {
+            class_names = extracted_names;
+            for (size_t i = 0; i < class_names.size(); ++i) {
+                std::cout << "  " << i << ": " << class_names[i] << std::endl;
+            }
+            std::cout.flush(); // Ensure output is visible
+        } else {
+            std::cout << "Class names file is empty, using default class names." << std::endl;
+            std::cout.flush();
+        }
+        
+    } catch (const std::exception& e) {
+        std::cout << "Error loading class names from text file: " << e.what() << std::endl;
+        std::cout << "Using default class names." << std::endl;
     }
 }
 
@@ -284,25 +347,44 @@ std::vector<cv::Rect> BirdDetectorYolov5::extract_boxes(const std::vector<cv::Ma
     confidences.clear();
     class_ids.clear();
     
-    for (const auto& output : outputs) {
+    for (size_t out_idx = 0; out_idx < outputs.size(); ++out_idx) {
+        const auto& output = outputs[out_idx];
+        
         const float* data = (float*)output.data;
         
-        for (int i = 0; i < output.rows; ++i) {
-            float confidence = data[4];
-            if (confidence >= confidence_threshold) {
-                // Extract class scores
-                cv::Mat scores = output.row(i).colRange(5, output.cols);
-                cv::Point class_id_point;
-                double max_class_score;
-                cv::minMaxLoc(scores, 0, &max_class_score, 0, &class_id_point);
+        // Handle 3D tensor: [batch_size, num_detections, features]
+        int batch_size = 1;
+        int num_detections = output.size[1];
+        int num_features = output.size[2]; 
+        
+        for (int i = 0; i < num_detections; ++i) {
+            // Data layout: [x_center, y_center, width, height, objectness, class0, class1, class2, class3]
+            int base_idx = i * num_features;
+            
+            float center_x = data[base_idx + 0];
+            float center_y = data[base_idx + 1]; 
+            float width = data[base_idx + 2];
+            float height = data[base_idx + 3];
+            float objectness = data[base_idx + 4];
+            
+            if (objectness >= confidence_threshold) {
+                // Find the class with maximum confidence
+                float max_class_score = 0.0f;
+                int best_class_id = 0;
+                for (int c = 0; c < num_features - 5; ++c) {  // Skip first 5 elements (bbox + objectness)
+                    float class_score = data[base_idx + 5 + c];
+                    if (class_score > max_class_score) {
+                        max_class_score = class_score;
+                        best_class_id = c;
+                    }
+                }
                 
-                if (max_class_score > confidence_threshold) {
-                    // Extract bounding box
-                    float center_x = data[0];
-                    float center_y = data[1];
-                    float width = data[2];
-                    float height = data[3];
-                    
+                // Final confidence is objectness * class_confidence
+                float final_confidence = objectness * max_class_score;
+                
+                if (final_confidence >= confidence_threshold) {
+                    // Convert from center coordinates to corner coordinates
+                    // Note: YOLOv5 outputs are typically normalized to image size already
                     int left = static_cast<int>((center_x - width / 2) * original_size.width / image_size.width);
                     int top = static_cast<int>((center_y - height / 2) * original_size.height / image_size.height);
                     int w = static_cast<int>(width * original_size.width / image_size.width);
@@ -313,12 +395,11 @@ std::vector<cv::Rect> BirdDetectorYolov5::extract_boxes(const std::vector<cv::Ma
                     
                     if (area > threshold_area) {
                         boxes.push_back(box);
-                        confidences.push_back(static_cast<float>(max_class_score));
-                        class_ids.push_back(class_id_point.x);
+                        confidences.push_back(final_confidence);
+                        class_ids.push_back(best_class_id);
                     }
                 }
             }
-            data += output.cols;
         }
     }
     

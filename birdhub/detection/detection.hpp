@@ -91,6 +91,8 @@ private:
     bool model_loaded;
     
     void load_model();
+    void load_class_names_from_model();
+    std::vector<std::string> get_default_class_names();
     cv::Mat preprocess_image(const cv::Mat& image);
     std::vector<cv::Rect> extract_boxes(const std::vector<cv::Mat>& outputs, const cv::Size& original_size, 
                                        std::vector<float>& confidences, std::vector<int>& class_ids);
