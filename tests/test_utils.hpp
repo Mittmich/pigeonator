@@ -3,6 +3,7 @@
 #include <opencv2/opencv.hpp>
 
 cv::Mat create_random_image(int rows, int cols);
+cv::Mat create_test_image_with_bird_like_pattern(int rows, int cols);
 
 class ConstantMockCameraCapture : public CameraCapture {
 public:

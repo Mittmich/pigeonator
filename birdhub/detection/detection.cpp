@@ -4,6 +4,9 @@
 #include <fstream>
 #include <sstream>
 #include <map>
+#include <algorithm>
+#include <cmath>
+#include <memory>
 
 Detector::Detector(
     std::set<EventType> listening_events,
@@ -510,4 +513,370 @@ std::optional<DetectionEvent> BirdDetectorYolov5::detect(std::shared_ptr<FrameEv
     );
     
     return detection_event;
+}
+
+// ClassStatistics implementation
+ClassStatistics::ClassStatistics() : total_confidence(0.0f), detection_count(0) {}
+
+float ClassStatistics::get_average_confidence() const {
+    return detection_count > 0 ? total_confidence / detection_count : 0.0f;
+}
+
+float ClassStatistics::get_weighted_score() const {
+    return total_confidence; // Sum of all confidences for this class
+}
+
+// Track implementation
+Track::Track(int id, const cv::Rect& bbox, Timestamp timestamp) 
+    : track_id(id), last_bbox(bbox), frames_since_last_detection(0), 
+      total_detections_in_track(0), last_detection_time(timestamp) {
+    last_center = cv::Point2f(bbox.x + bbox.width/2.0f, bbox.y + bbox.height/2.0f);
+    trajectory.push_back(last_center);
+}
+
+std::string Track::get_most_likely_class() const {
+    if (class_votes.empty()) return "unknown";
+    
+    std::string best_class;
+    float best_score = -1.0f;
+    for (const auto& [class_name, stats] : class_votes) {
+        if (stats.get_weighted_score() > best_score) {
+            best_score = stats.get_weighted_score();
+            best_class = class_name;
+        }
+    }
+    return best_class;
+}
+
+bool Track::has_reached_consensus(int minimum_detections) const {
+    return total_detections_in_track >= minimum_detections;
+}
+
+float Track::get_mean_confidence_for_consensus_class() const {
+    std::string consensus_class = get_most_likely_class();
+    auto it = class_votes.find(consensus_class);
+    if (it != class_votes.end()) {
+        return it->second.get_average_confidence();
+    }
+    return 0.0f;
+}
+
+// ObjectTracker implementation
+ObjectTracker::ObjectTracker(
+    float iou_threshold,
+    int max_frames_without_detection,
+    float max_path_length_threshold
+) : iou_threshold(iou_threshold),
+    max_frames_without_detection(max_frames_without_detection),
+    max_path_length_threshold(max_path_length_threshold),
+    next_track_id(0) {}
+
+void ObjectTracker::update_tracks(const std::vector<Detection>& detections, Timestamp current_time) {
+    // Increment frame count for all tracks
+    increment_frames_without_detection();
+    
+    // Associate detections with existing tracks
+    associate_detections_to_tracks(detections, current_time);
+    
+    // Prune old or invalid tracks
+    prune_tracks();
+}
+
+void ObjectTracker::associate_detections_to_tracks(
+    const std::vector<Detection>& detections, 
+    Timestamp current_time
+) {
+    std::vector<bool> detection_associated(detections.size(), false);
+    
+    // Extract bounding boxes from detections
+    std::vector<cv::Rect> detection_boxes;
+    std::vector<std::string> detection_labels;
+    std::vector<float> detection_confidences;
+    std::vector<size_t> detection_indices;
+    
+    for (size_t det_idx = 0; det_idx < detections.size(); ++det_idx) {
+        const auto& detection = detections[det_idx];
+        auto bboxes = detection.get_bounding_boxes();
+        auto labels = detection.get_labels();
+        auto confidences = detection.get_confidences();
+        
+        if (bboxes.has_value() && labels.has_value() && confidences.has_value()) {
+            const auto& bbox_vec = bboxes.value();
+            const auto& label_vec = labels.value();
+            const auto& conf_vec = confidences.value();
+            
+            for (size_t i = 0; i < bbox_vec.size(); ++i) {
+                detection_boxes.push_back(bbox_vec[i]);
+                detection_labels.push_back(i < label_vec.size() ? label_vec[i] : "unknown");
+                detection_confidences.push_back(i < conf_vec.size() ? conf_vec[i] : 0.0f);
+                detection_indices.push_back(det_idx);
+            }
+        }
+    }
+    
+    // Associate each detection box with tracks
+    for (size_t box_idx = 0; box_idx < detection_boxes.size(); ++box_idx) {
+        const cv::Rect& det_box = detection_boxes[box_idx];
+        cv::Point2f det_center(det_box.x + det_box.width/2.0f, det_box.y + det_box.height/2.0f);
+        
+        float best_iou = 0.0f;
+        int best_track_idx = -1;
+        
+        // Find best matching track
+        for (size_t track_idx = 0; track_idx < active_tracks.size(); ++track_idx) {
+            Track& track = active_tracks[track_idx];
+            float iou = calculate_iou(track.last_bbox, det_box);
+            
+            if (iou > iou_threshold && iou > best_iou) {
+                // Check if path length would exceed threshold
+                if (!should_drop_track_for_path_length(track, det_center)) {
+                    best_iou = iou;
+                    best_track_idx = track_idx;
+                }
+            }
+        }
+        
+        // Update best matching track
+        if (best_track_idx >= 0) {
+            Track& track = active_tracks[best_track_idx];
+            
+            // Update track properties
+            track.last_bbox = det_box;
+            track.last_center = det_center;
+            track.trajectory.push_back(det_center);
+            track.frames_since_last_detection = 0;
+            track.total_detections_in_track++;
+            track.last_detection_time = current_time;
+            
+            // Update class statistics
+            std::string class_name = detection_labels[box_idx];
+            float confidence = detection_confidences[box_idx];
+            
+            if (track.class_votes.find(class_name) == track.class_votes.end()) {
+                track.class_votes[class_name] = ClassStatistics();
+            }
+            track.class_votes[class_name].total_confidence += confidence;
+            track.class_votes[class_name].detection_count++;
+            
+            // Mark detection as associated
+            size_t orig_det_idx = detection_indices[box_idx];
+            detection_associated[orig_det_idx] = true;
+        }
+    }
+    
+    // Create new tracks for unassociated detections
+    std::vector<Detection> unassociated_detections;
+    for (size_t i = 0; i < detections.size(); ++i) {
+        if (!detection_associated[i]) {
+            unassociated_detections.push_back(detections[i]);
+        }
+    }
+    
+    create_new_tracks(unassociated_detections, current_time);
+}
+
+void ObjectTracker::create_new_tracks(
+    const std::vector<Detection>& unassociated_detections,
+    Timestamp current_time
+) {
+    for (const auto& detection : unassociated_detections) {
+        auto bboxes = detection.get_bounding_boxes();
+        auto labels = detection.get_labels();
+        auto confidences = detection.get_confidences();
+        
+        if (bboxes.has_value() && labels.has_value() && confidences.has_value()) {
+            const auto& bbox_vec = bboxes.value();
+            const auto& label_vec = labels.value();
+            const auto& conf_vec = confidences.value();
+            
+            for (size_t i = 0; i < bbox_vec.size(); ++i) {
+                // Create new track
+                Track new_track(next_track_id++, bbox_vec[i], current_time);
+                new_track.total_detections_in_track = 1;
+                
+                // Add class vote
+                std::string class_name = i < label_vec.size() ? label_vec[i] : "unknown";
+                float confidence = i < conf_vec.size() ? conf_vec[i] : 0.0f;
+                
+                new_track.class_votes[class_name] = ClassStatistics();
+                new_track.class_votes[class_name].total_confidence = confidence;
+                new_track.class_votes[class_name].detection_count = 1;
+                
+                active_tracks.push_back(new_track);
+            }
+        }
+    }
+}
+
+bool ObjectTracker::should_drop_track_for_path_length(Track& track, const cv::Point2f& new_center) {
+    float distance = calculate_distance(track.last_center, new_center);
+    
+    if (distance > max_path_length_threshold) {
+        // Reset track statistics but keep the track with new position
+        track.class_votes.clear();
+        track.total_detections_in_track = 0;
+        track.trajectory.clear();
+        track.trajectory.push_back(new_center);
+        return false; // Don't drop, but reset
+    }
+    
+    return false;
+}
+
+void ObjectTracker::increment_frames_without_detection() {
+    for (auto& track : active_tracks) {
+        track.frames_since_last_detection++;
+    }
+}
+
+void ObjectTracker::prune_tracks() {
+    active_tracks.erase(
+        std::remove_if(active_tracks.begin(), active_tracks.end(),
+            [this](const Track& track) {
+                return track.frames_since_last_detection > max_frames_without_detection;
+            }),
+        active_tracks.end()
+    );
+}
+
+std::vector<Track> ObjectTracker::get_tracks_with_consensus(int minimum_detections) const {
+    std::vector<Track> consensus_tracks;
+    for (const auto& track : active_tracks) {
+        if (track.has_reached_consensus(minimum_detections)) {
+            consensus_tracks.push_back(track);
+        }
+    }
+    return consensus_tracks;
+}
+
+std::vector<Track> ObjectTracker::get_all_active_tracks() const {
+    return active_tracks;
+}
+
+void ObjectTracker::remove_track(int track_id) {
+    active_tracks.erase(
+        std::remove_if(active_tracks.begin(), active_tracks.end(),
+            [track_id](const Track& track) {
+                return track.track_id == track_id;
+            }),
+        active_tracks.end()
+    );
+}
+
+float ObjectTracker::calculate_distance(const cv::Point2f& p1, const cv::Point2f& p2) const {
+    float dx = p1.x - p2.x;
+    float dy = p1.y - p2.y;
+    return std::sqrt(dx*dx + dy*dy);
+}
+
+float ObjectTracker::calculate_iou(const cv::Rect& box1, const cv::Rect& box2) const {
+    cv::Rect intersection = box1 & box2;
+    float intersection_area = intersection.area();
+    float union_area = box1.area() + box2.area() - intersection_area;
+    
+    return union_area > 0 ? intersection_area / union_area : 0.0f;
+}
+
+// SingleClassSequenceDetector implementation
+SingleClassSequenceDetector::SingleClassSequenceDetector(
+    std::shared_ptr<Detector> base_detector,
+    std::shared_ptr<ImageStore> image_store,
+    int minimum_number_detections,
+    float iou_threshold,
+    int max_frames_without_detection,
+    float max_path_length_threshold
+) : Detector({EventType::NEW_FRAME}, image_store),
+    base_detector(base_detector),
+    minimum_number_detections(minimum_number_detections) {
+    
+    tracker = std::make_unique<ObjectTracker>(
+        iou_threshold, 
+        max_frames_without_detection, 
+        max_path_length_threshold
+    );
+}
+
+SingleClassSequenceDetector::~SingleClassSequenceDetector() = default;
+
+std::optional<DetectionEvent> SingleClassSequenceDetector::detect(
+    std::shared_ptr<FrameEvent> frame_event
+) {
+    // Delegate detection to base detector
+    std::optional<DetectionEvent> base_result = base_detector->detect(frame_event);
+    
+    if (base_result.has_value()) {
+        std::vector<Detection> detections = base_result.value().get_detections();
+        
+        // Update tracker with new detections
+        tracker->update_tracks(detections, frame_event->get_timestamp());
+        
+        // Store detections by track ID for consensus processing
+        for (const auto& detection : detections) {
+            // In a more sophisticated implementation, you would map detections back to track IDs
+            // For now, we'll process consensus tracks independently
+        }
+    }
+    
+    // Check for tracks that have reached consensus
+    std::vector<Track> consensus_tracks = tracker->get_tracks_with_consensus(minimum_number_detections);
+    
+    if (!consensus_tracks.empty()) {
+        // Process consensus tracks and create detection events
+        std::vector<Detection> all_consensus_detections;
+        
+        for (const auto& track : consensus_tracks) {
+            // Create consensus detection for this track
+            auto meta_data = create_consensus_metadata(track);
+            
+            Detection consensus_detection(
+                frame_event->get_timestamp(),
+                frame_event,
+                std::vector<std::string>{track.get_most_likely_class()},
+                std::vector<float>{track.get_mean_confidence_for_consensus_class()},
+                std::vector<cv::Rect>{track.last_bbox},
+                std::vector<int>{track.last_bbox.area()},
+                meta_data
+            );
+            
+            all_consensus_detections.push_back(consensus_detection);
+        }
+        
+        if (!all_consensus_detections.empty()) {
+            // Clean up processed tracks (remove them from active tracking)
+            cleanup_completed_tracks(consensus_tracks);
+            
+            return DetectionEvent(
+                frame_event->get_timestamp(),
+                all_consensus_detections
+            );
+        }
+    }
+    
+    return std::nullopt;
+}
+
+void SingleClassSequenceDetector::cleanup_completed_tracks(const std::vector<Track>& consensus_tracks) {
+    // Remove tracks that have reached consensus from active tracking
+    for (const auto& consensus_track : consensus_tracks) {
+        tracker->remove_track(consensus_track.track_id);
+    }
+}
+
+std::optional<std::map<std::string, std::string>> 
+SingleClassSequenceDetector::create_consensus_metadata(const Track& track) const {
+    std::map<std::string, std::string> meta;
+    meta["detector_type"] = "SingleClassSequenceDetector";
+    meta["track_id"] = std::to_string(track.track_id);
+    meta["most_likely_object"] = track.get_most_likely_class();
+    meta["mean_confidence"] = std::to_string(track.get_mean_confidence_for_consensus_class());
+    meta["total_detections_in_track"] = std::to_string(track.total_detections_in_track);
+    meta["detection_type"] = "track_consensus";
+    
+    // Add class distribution information
+    for (const auto& [class_name, stats] : track.class_votes) {
+        meta["class_" + class_name + "_count"] = std::to_string(stats.detection_count);
+        meta["class_" + class_name + "_total_conf"] = std::to_string(stats.total_confidence);
+    }
+    
+    return meta;
 }

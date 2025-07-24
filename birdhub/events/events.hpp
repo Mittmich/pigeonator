@@ -84,13 +84,13 @@ class Detection {
          std::optional<std::vector<int>> detection_areas = std::nullopt,
          std::optional<std::map<std::string, std::string>> meta_data = std::nullopt);
     ~Detection();
-    Timestamp get_timestamp();
-    std::shared_ptr<FrameEvent> get_frame_event();
-    std::optional<std::vector<std::string>> get_labels();
-    std::optional<std::vector<float>> get_confidences();
-    std::optional<std::vector<cv::Rect>> get_bounding_boxes();
-    std::optional<std::vector<int>> get_detection_areas();
-    std::optional<std::map<std::string, std::string>> get_meta_data();
+    Timestamp get_timestamp() const;
+    std::shared_ptr<FrameEvent> get_frame_event() const;
+    std::optional<std::vector<std::string>> get_labels() const;
+    std::optional<std::vector<float>> get_confidences() const;
+    std::optional<std::vector<cv::Rect>> get_bounding_boxes() const;
+    std::optional<std::vector<int>> get_detection_areas() const;
+    std::optional<std::map<std::string, std::string>> get_meta_data() const;
 private:
     Timestamp timestamp;
     std::shared_ptr<FrameEvent> frame_event;
@@ -111,7 +111,7 @@ public:
          std::optional<std::map<std::string, std::string>> meta_data = std::nullopt);
     ~DetectionEvent();
     EventType type = EventType::DETECTION;
-    std::vector<Detection> get_detections();
+    std::vector<Detection> get_detections() const;
 private:
     std::vector<Detection> detections;
 };

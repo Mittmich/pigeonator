@@ -9,6 +9,18 @@ cv::Mat create_random_image(int rows, int cols) {
     return img;
 }
 
+cv::Mat create_test_image_with_bird_like_pattern(int rows, int cols) {
+    cv::Mat img(rows, cols, CV_8UC3, cv::Scalar(100, 150, 100)); // Green background
+    
+    // Add a bird-like pattern in the center
+    cv::Point center(cols/2, rows/2);
+    cv::ellipse(img, center, cv::Size(30, 20), 0, 0, 360, cv::Scalar(80, 80, 120), -1);
+    cv::circle(img, cv::Point(center.x - 10, center.y - 5), 3, cv::Scalar(50, 50, 80), -1); // Eye
+    cv::circle(img, cv::Point(center.x + 15, center.y), 2, cv::Scalar(120, 100, 80), -1);   // Beak
+    
+    return img;
+}
+
 // ConstantMockCameraCapture class
 ConstantMockCameraCapture::ConstantMockCameraCapture(const char* device, int width, int height, uint32_t pixel_format) {}
 cv::Mat ConstantMockCameraCapture::getNextFrame() {

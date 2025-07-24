@@ -42,7 +42,7 @@ DetectionEvent::DetectionEvent(
 
 DetectionEvent::~DetectionEvent() = default;
 
-std::vector<Detection> DetectionEvent::get_detections()
+std::vector<Detection> DetectionEvent::get_detections() const
 {
     return detections;
 }
@@ -66,37 +66,37 @@ Detection::Detection(
 Detection::~Detection() = default;
 
 
-std::shared_ptr<FrameEvent> Detection::get_frame_event()
+std::shared_ptr<FrameEvent> Detection::get_frame_event() const
 {
     return frame_event;
 }
 
-std::optional<std::vector<std::string>> Detection::get_labels()
+std::optional<std::vector<std::string>> Detection::get_labels() const
 {
     return labels;
 }
 
-std::optional<std::vector<float>> Detection::get_confidences()
+std::optional<std::vector<float>> Detection::get_confidences() const
 {
     return confidences;
 }
 
-std::optional<std::vector<cv::Rect>> Detection::get_bounding_boxes()
+std::optional<std::vector<cv::Rect>> Detection::get_bounding_boxes() const
 {
     return bounding_boxes;
 }
 
-std::optional<std::vector<int>> Detection::get_detection_areas()
+std::optional<std::vector<int>> Detection::get_detection_areas() const
 {
     return detection_areas;
 }
 
-Timestamp Detection::get_timestamp()
+Timestamp Detection::get_timestamp() const
 {
     return timestamp;
 }
 
-std::optional<std::map<std::string, std::string>> Detection::get_meta_data()
+std::optional<std::map<std::string, std::string>> Detection::get_meta_data() const
 {
     return meta_data;
 }
