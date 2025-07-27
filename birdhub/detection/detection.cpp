@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cmath>
 #include <memory>
+#include <deque>
 
 Detector::Detector(
     std::set<EventType> listening_events,
@@ -879,4 +880,148 @@ SingleClassSequenceDetector::create_consensus_metadata(const Track& track) const
     }
     
     return meta;
+}
+
+// MotionActivatedDetector implementation
+MotionActivatedDetector::MotionActivatedDetector(
+    std::shared_ptr<Detector> motion_detector,
+    std::shared_ptr<Detector> secondary_detector,
+    std::shared_ptr<ImageStore> image_store,
+    int slack_frames,
+    int max_frame_history
+) : Detector({EventType::NEW_FRAME}, image_store),
+    motion_detector(motion_detector),
+    secondary_detector(secondary_detector),
+    slack_frames_remaining(0),
+    slack_frames(slack_frames),
+    max_frame_history(max_frame_history),
+    motion_detected_recently(false) {}
+
+MotionActivatedDetector::~MotionActivatedDetector() = default;
+
+std::optional<DetectionEvent> MotionActivatedDetector::detect(
+    std::shared_ptr<FrameEvent> frame_event
+) {
+    // Always update frame history to keep recent frames available
+    update_frame_history(frame_event);
+    
+    // Check for motion detection
+    std::optional<DetectionEvent> motion_result = motion_detector->detect(frame_event);
+    
+    if (motion_result.has_value()) {
+        // Motion detected! Set up for secondary detection
+        motion_detected_recently = true;
+        slack_frames_remaining = slack_frames;
+        
+        // Process all accumulated frames through secondary detector
+        process_accumulated_frames();
+        
+        // Now process the current frame through secondary detector
+        std::optional<DetectionEvent> secondary_result = secondary_detector->detect(frame_event);
+        
+        if (secondary_result.has_value()) {
+            // Enhance metadata to indicate this was motion-activated
+            std::vector<Detection> enhanced_detections;
+            
+            for (const auto& detection : secondary_result.value().get_detections()) {
+                auto meta_data = detection.get_meta_data();
+                std::map<std::string, std::string> enhanced_meta;
+                
+                if (meta_data.has_value()) {
+                    enhanced_meta = meta_data.value();
+                }
+                
+                enhanced_meta["activation_type"] = "motion_triggered";
+                enhanced_meta["motion_detector_triggered"] = "true";
+                
+                Detection enhanced_detection(
+                    detection.get_timestamp(),
+                    detection.get_frame_event(),
+                    detection.get_labels(),
+                    detection.get_confidences(),
+                    detection.get_bounding_boxes(),
+                    detection.get_detection_areas(),
+                    enhanced_meta
+                );
+                
+                enhanced_detections.push_back(enhanced_detection);
+            }
+            
+            return DetectionEvent(
+                frame_event->get_timestamp(),
+                enhanced_detections
+            );
+        }
+    } else if (motion_detected_recently && slack_frames_remaining > 0) {
+        // No motion this frame, but we're still in the slack period
+        slack_frames_remaining--;
+        
+        // Continue processing frames through secondary detector
+        std::optional<DetectionEvent> secondary_result = secondary_detector->detect(frame_event);
+        
+        if (secondary_result.has_value()) {
+            // Enhance metadata to indicate this was motion-activated (slack period)
+            std::vector<Detection> enhanced_detections;
+            
+            for (const auto& detection : secondary_result.value().get_detections()) {
+                auto meta_data = detection.get_meta_data();
+                std::map<std::string, std::string> enhanced_meta;
+                
+                if (meta_data.has_value()) {
+                    enhanced_meta = meta_data.value();
+                }
+                
+                enhanced_meta["activation_type"] = "motion_triggered_slack";
+                enhanced_meta["slack_frames_remaining"] = std::to_string(slack_frames_remaining);
+                
+                Detection enhanced_detection(
+                    detection.get_timestamp(),
+                    detection.get_frame_event(),
+                    detection.get_labels(),
+                    detection.get_confidences(),
+                    detection.get_bounding_boxes(),
+                    detection.get_detection_areas(),
+                    enhanced_meta
+                );
+                
+                enhanced_detections.push_back(enhanced_detection);
+            }
+            
+            return DetectionEvent(
+                frame_event->get_timestamp(),
+                enhanced_detections
+            );
+        }
+        
+        // Reset motion state if slack period expired
+        if (slack_frames_remaining == 0) {
+            reset_motion_state();
+        }
+    }
+    
+    return std::nullopt;
+}
+
+void MotionActivatedDetector::update_frame_history(std::shared_ptr<FrameEvent> frame_event) {
+    frame_history.push_back(frame_event);
+    
+    // Maintain maximum history size
+    while (frame_history.size() > static_cast<size_t>(max_frame_history)) {
+        frame_history.pop_front();
+    }
+}
+
+void MotionActivatedDetector::process_accumulated_frames() {
+    // Process all frames in history through secondary detector
+    // This ensures the secondary detector has context from before motion was detected
+    for (const auto& historical_frame : frame_history) {
+        // Process but don't emit results from historical frames
+        // This builds up internal state in the secondary detector
+        secondary_detector->detect(historical_frame);
+    }
+}
+
+void MotionActivatedDetector::reset_motion_state() {
+    motion_detected_recently = false;
+    slack_frames_remaining = 0;
 }

@@ -7,6 +7,7 @@
 #include <map>
 #include <vector>
 #include <memory>
+#include <deque>
 
 #pragma once
 
@@ -196,4 +197,35 @@ private:
     );
     void cleanup_completed_tracks(const std::vector<Track>& consensus_tracks);
     std::optional<std::map<std::string, std::string>> create_consensus_metadata(const Track& track) const;
+};
+
+// Motion activated detector - composition of motion detector and another detector
+class MotionActivatedDetector : public Detector {
+public:
+    MotionActivatedDetector(
+        std::shared_ptr<Detector> motion_detector,
+        std::shared_ptr<Detector> secondary_detector,
+        std::shared_ptr<ImageStore> image_store,
+        int slack_frames = 5,
+        int max_frame_history = 10
+    );
+    ~MotionActivatedDetector();
+    
+    std::optional<DetectionEvent> detect(std::shared_ptr<FrameEvent> frame_event) override;
+
+private:
+    std::shared_ptr<Detector> motion_detector;
+    std::shared_ptr<Detector> secondary_detector;
+    
+    // Frame management for motion-triggered detection
+    std::deque<std::shared_ptr<FrameEvent>> frame_history;
+    int slack_frames_remaining;
+    int slack_frames;
+    int max_frame_history;
+    bool motion_detected_recently;
+    
+    // Helper methods
+    void update_frame_history(std::shared_ptr<FrameEvent> frame_event);
+    void process_accumulated_frames();
+    void reset_motion_state();
 };

@@ -14,7 +14,7 @@ target_link_libraries(test_utils PUBLIC
 )
 
 
-add_executable(all_tests main.cpp test_video.cpp test_events.cpp test_detection.cpp test_orchestration.cpp test_recorder.cpp test_bird_detector.cpp test_single_class_sequence_detector.cpp)
+add_executable(all_tests main.cpp test_video.cpp test_events.cpp test_detection.cpp test_orchestration.cpp test_recorder.cpp test_bird_detector.cpp test_single_class_sequence_detector.cpp test_motion_activated_detector.cpp)
 target_include_directories(all_tests PUBLIC
                          "${PROJECT_BINARY_DIR}"
                          "${PROJECT_SOURCE_DIR}/birdhub/video"
