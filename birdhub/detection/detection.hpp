@@ -129,6 +129,8 @@ struct Track {
     int total_detections_in_track;
     std::vector<cv::Point2f> trajectory;
     Timestamp last_detection_time;
+    // Keep the contributing detections for this track so we can emit one per frame upon consensus
+    std::vector<Detection> detections_in_track;
     
     Track(int id, const cv::Rect& bbox, Timestamp timestamp);
     std::string get_most_likely_class() const;

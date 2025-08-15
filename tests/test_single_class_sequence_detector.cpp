@@ -167,18 +167,24 @@ TEST_CASE("SingleClassSequenceDetector - Single Track Consensus") {
         };
         
         std::optional<DetectionEvent> consensus_result;
+        std::vector<Timestamp> detection_timestamps;
         
         for (size_t i = 0; i < track_positions.size(); ++i) {
             // Create frame with pigeon at specific position
             cv::Mat img = create_pigeon_track_image(track_positions[i].x, track_positions[i].y, i);
             Timestamp timestamp = test_now() + std::chrono::milliseconds(i * 100);
+            detection_timestamps.push_back(timestamp);
             image_store->put(timestamp, img);
             
             // Configure mock detection for this frame
             mock_detector->clear_mock_detections();
             cv::Rect bbox(track_positions[i].x - 15, track_positions[i].y - 10, 30, 20);
             mock_detector->add_mock_detection("pigeon", 0.8f + (i * 0.02f), bbox);
-            
+            // add bounding box to image for writing to debug file
+            cv::rectangle(img, bbox, cv::Scalar(0, 255, 0), 2);
+            // add class information
+            cv::putText(img, "pigeon", cv::Point(bbox.x, bbox.y - 5), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 255, 0), 2);
+
             auto frame_event = std::make_shared<FrameEvent>(timestamp, std::nullopt);
             auto result = sequence_detector.detect(frame_event);
             
@@ -187,12 +193,16 @@ TEST_CASE("SingleClassSequenceDetector - Single Track Consensus") {
                 break;
             }
         }
-        
+
         REQUIRE(consensus_result.has_value());
         
         auto detections = consensus_result.value().get_detections();
-        CHECK(detections.size() == 1);
-        
+        CHECK(detections.size() == 3);
+        // Ensure that the detections contained are the last three ones
+        CHECK(detections[0].get_frame_event()->get_timestamp() == detection_timestamps[0]);
+        CHECK(detections[1].get_frame_event()->get_timestamp() == detection_timestamps[1]);
+        CHECK(detections[2].get_frame_event()->get_timestamp() == detection_timestamps[2]);
+
         auto detection = detections[0];
         auto labels = detection.get_labels();
         auto meta_data = detection.get_meta_data();
@@ -270,7 +280,6 @@ TEST_CASE("SingleClassSequenceDetector - Multi-Track Scenario") {
         };
         
         std::vector<std::optional<DetectionEvent>> results;
-        
         for (size_t i = 0; i < frame_data.size(); ++i) {
             auto [pos1, pos2, class1, class2] = frame_data[i];
             
@@ -282,12 +291,10 @@ TEST_CASE("SingleClassSequenceDetector - Multi-Track Scenario") {
             // Add two detections per frame
             mock_detector->add_mock_detection(class1, 0.8f, cv::Rect(pos1.x - 15, pos1.y - 10, 30, 20));
             mock_detector->add_mock_detection(class2, 0.7f, cv::Rect(pos2.x - 15, pos2.y - 10, 30, 20));
-            
             auto frame_event = std::make_shared<FrameEvent>(timestamp, std::nullopt);
             auto result = sequence_detector.detect(frame_event);
             results.push_back(result);
         }
-        
         // Check that we eventually get consensus results
         bool found_consensus = false;
         for (const auto& result : results) {
@@ -470,7 +477,7 @@ TEST_CASE("SingleClassSequenceDetector - Real Image Integration") {
         
         if (consensus_result.has_value()) {
             auto detections = consensus_result.value().get_detections();
-            CHECK(detections.size() == 1);
+            CHECK(detections.size() == 3);
             
             auto detection = detections[0];
             auto labels = detection.get_labels();

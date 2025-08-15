@@ -638,7 +638,7 @@ void ObjectTracker::associate_detections_to_tracks(
         }
         
         // Update best matching track
-        if (best_track_idx >= 0) {
+    if (best_track_idx >= 0) {
             Track& track = active_tracks[best_track_idx];
             
             // Update track properties
@@ -662,6 +662,9 @@ void ObjectTracker::associate_detections_to_tracks(
             // Mark detection as associated
             size_t orig_det_idx = detection_indices[box_idx];
             detection_associated[orig_det_idx] = true;
+
+            // Record contributing detection into track history to enable consensus emission per frame
+            track.detections_in_track.push_back(detections[orig_det_idx]);
         }
     }
     
@@ -702,6 +705,9 @@ void ObjectTracker::create_new_tracks(
                 new_track.class_votes[class_name] = ClassStatistics();
                 new_track.class_votes[class_name].total_confidence = confidence;
                 new_track.class_votes[class_name].detection_count = 1;
+
+                // Record the detection as contributing to this new track
+                new_track.detections_in_track.push_back(detection);
                 
                 active_tracks.push_back(new_track);
             }
@@ -822,30 +828,18 @@ std::optional<DetectionEvent> SingleClassSequenceDetector::detect(
     std::vector<Track> consensus_tracks = tracker->get_tracks_with_consensus(minimum_number_detections);
     
     if (!consensus_tracks.empty()) {
-        // Process consensus tracks and create detection events
+        // Build consensus detections based on all contributing frames per track
         std::vector<Detection> all_consensus_detections;
-        
         for (const auto& track : consensus_tracks) {
-            // Create consensus detection for this track
-            auto meta_data = create_consensus_metadata(track);
-            
-            Detection consensus_detection(
-                frame_event->get_timestamp(),
-                frame_event,
-                std::vector<std::string>{track.get_most_likely_class()},
-                std::vector<float>{track.get_mean_confidence_for_consensus_class()},
-                std::vector<cv::Rect>{track.last_bbox},
-                std::vector<int>{track.last_bbox.area()},
-                meta_data
-            );
-            
-            all_consensus_detections.push_back(consensus_detection);
+            // Rewrite all detections in this track to the consensus class and bbox
+            auto rewritten = rewrite_track_detections_to_consensus(track.detections_in_track, track, frame_event->get_timestamp());
+            all_consensus_detections.insert(all_consensus_detections.end(), rewritten.begin(), rewritten.end());
         }
-        
+
         if (!all_consensus_detections.empty()) {
             // Clean up processed tracks (remove them from active tracking)
             cleanup_completed_tracks(consensus_tracks);
-            
+
             return DetectionEvent(
                 frame_event->get_timestamp(),
                 all_consensus_detections
@@ -854,6 +848,34 @@ std::optional<DetectionEvent> SingleClassSequenceDetector::detect(
     }
     
     return std::nullopt;
+}
+std::vector<Detection> SingleClassSequenceDetector::rewrite_track_detections_to_consensus(
+    const std::vector<Detection>& track_detections,
+    const Track& consensus_track,
+    Timestamp timestamp
+) {
+    std::vector<Detection> rewritten;
+    const std::string cls = consensus_track.get_most_likely_class();
+    const float mean_conf = consensus_track.get_mean_confidence_for_consensus_class();
+    auto meta_data = create_consensus_metadata(consensus_track);
+
+    for (const auto& det : track_detections) {
+        // Prefer original frame_event/timestamp to reflect per-frame detection
+        Timestamp det_ts = det.get_timestamp();
+        auto det_frame_evt = det.get_frame_event();
+
+        Detection consensus_detection(
+            det_ts,
+            det_frame_evt,
+            std::vector<std::string>{cls},
+            std::vector<float>{mean_conf},
+            std::vector<cv::Rect>{consensus_track.last_bbox},
+            std::vector<int>{consensus_track.last_bbox.area()},
+            meta_data
+        );
+        rewritten.push_back(consensus_detection);
+    }
+    return rewritten;
 }
 
 void SingleClassSequenceDetector::cleanup_completed_tracks(const std::vector<Track>& consensus_tracks) {
