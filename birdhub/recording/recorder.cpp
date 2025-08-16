@@ -495,6 +495,8 @@ void EventRecorder::handle_detection(std::shared_ptr<DetectionEvent> detection_e
         for (const auto& frame_event : video_buffer) {
             this->_write_frame_to_filebuffer(frame_event);
         }
+        // write detections to file
+        this->_write_detections_to_filebuffer(detection_event);
         // clear video buffer
         video_buffer.clear();
         // log the start of recording
