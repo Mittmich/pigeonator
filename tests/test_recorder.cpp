@@ -387,18 +387,14 @@ public:
         const std::string& output_directory = ".",
         int slack = 100,
         int fps = 30,
-        int look_back_frames = 3,
-        int detection_buffer_size = 200
-    ) : EventRecorder(listening_events, image_store, output_directory, slack, fps, look_back_frames, detection_buffer_size) {}
+        int look_back_frames = 3
+    ) : EventRecorder(listening_events, image_store, output_directory, slack, fps, look_back_frames) {}
     
     // Expose protected methods for testing
     FrameEvent test_create_detection_frame(std::shared_ptr<DetectionEvent> detection_event, Timestamp frame_timestamp) {
         return create_detection_frame(detection_event, frame_timestamp);
     }
     
-    std::vector<FrameEvent> test_create_detection_frames(std::shared_ptr<DetectionEvent> detection_event) {
-        return create_detection_frames(detection_event);
-    }
     
     void test_handle_new_frame(std::shared_ptr<FrameEvent> event) {
         handle_new_frame(event);
@@ -418,7 +414,7 @@ TEST_CASE("EventRecorder constructor initializes with custom parameters") {
     auto image_store = std::make_shared<ImageStore>(50);
     std::string temp_dir = create_temp_directory();
     
-    EventRecorder recorder(events, image_store, temp_dir, 50, 25, 5, 150);
+    EventRecorder recorder(events, image_store, temp_dir, 50, 25, 5);
     
     CHECK(recorder.listening_to() == events);
     
@@ -457,7 +453,7 @@ TEST_CASE("EventRecorder handles new frame updates buffers") {
     auto image_store = std::make_shared<ImageStore>(50);
     std::string temp_dir = create_temp_directory();
     
-    TestableEventRecorder recorder(events, image_store, temp_dir, 10, 30, 3, 5);
+    TestableEventRecorder recorder(events, image_store, temp_dir, 10, 30, 3);
     auto event_queue = std::make_shared<std::queue<std::shared_ptr<Event>>>();
     recorder.set_event_queue(event_queue);
     
@@ -495,7 +491,7 @@ TEST_CASE("EventRecorder starts recording on detection event") {
     auto image_store = std::make_shared<ImageStore>(50);
     std::string temp_dir = create_temp_directory();
     
-    TestableEventRecorder recorder(events, image_store, temp_dir, 5, 30, 2, 10);
+    TestableEventRecorder recorder(events, image_store, temp_dir, 5, 30, 2);
     auto event_queue = std::make_shared<std::queue<std::shared_ptr<Event>>>();
     recorder.set_event_queue(event_queue);
     
@@ -549,7 +545,7 @@ TEST_CASE("EventRecorder creates detection frames for multiple timestamps") {
     auto image_store = std::make_shared<ImageStore>(50);
     std::string temp_dir = create_temp_directory();
     
-    TestableEventRecorder recorder(events, image_store, temp_dir, 10, 30, 3, 20);
+    TestableEventRecorder recorder(events, image_store, temp_dir, 10, 30, 3);
     auto event_queue = std::make_shared<std::queue<std::shared_ptr<Event>>>();
     recorder.set_event_queue(event_queue);
     
@@ -604,7 +600,7 @@ TEST_CASE("EventRecorder buffer size limits are respected") {
     std::string temp_dir = create_temp_directory();
     
     // Create recorder with small buffer size for testing
-    TestableEventRecorder recorder(events, image_store, temp_dir, 5, 30, 2, 3);
+    TestableEventRecorder recorder(events, image_store, temp_dir, 5, 30, 2);
     auto event_queue = std::make_shared<std::queue<std::shared_ptr<Event>>>();
     recorder.set_event_queue(event_queue);
     
@@ -631,7 +627,7 @@ TEST_CASE("EventRecorder creates detection video file when recording") {
     auto image_store = std::make_shared<ImageStore>(50);
     std::string temp_dir = create_temp_directory();
     
-    TestableEventRecorder recorder(events, image_store, temp_dir, 3, 30, 2, 2); // Small detection buffer
+    TestableEventRecorder recorder(events, image_store, temp_dir, 3, 30, 2); // Small detection buffer
     auto event_queue = std::make_shared<std::queue<std::shared_ptr<Event>>>();
     recorder.set_event_queue(event_queue);
     
@@ -685,7 +681,7 @@ TEST_CASE("EventRecorder full integration test with notify interface") {
     auto image_store = std::make_shared<ImageStore>(50);
     std::string temp_dir = create_temp_directory();
     
-    EventRecorder recorder(events, image_store, temp_dir, 3, 30, 2, 5);
+    EventRecorder recorder(events, image_store, temp_dir, 3, 30, 2);
     auto event_queue = std::make_shared<std::queue<std::shared_ptr<Event>>>();
     recorder.set_event_queue(event_queue);
     
@@ -779,7 +775,7 @@ TEST_CASE("EventRecorder writes correct number of frames to recording video") {
     auto image_store = std::make_shared<ImageStore>(50);
     std::string temp_dir = create_temp_directory();
     
-    EventRecorder recorder(events, image_store, temp_dir, 10, 30, 10, 100);
+    EventRecorder recorder(events, image_store, temp_dir, 10, 30, 10);
     auto event_queue = std::make_shared<std::queue<std::shared_ptr<Event>>>();
     recorder.set_event_queue(event_queue);
 
@@ -852,7 +848,7 @@ TEST_CASE("EventRecorder writes correct number of frames to detection video") {
     auto image_store = std::make_shared<ImageStore>(50);
     std::string temp_dir = create_temp_directory();
     
-    EventRecorder recorder(events, image_store, temp_dir, 10, 30, 10, 100);
+    EventRecorder recorder(events, image_store, temp_dir, 10, 30, 10);
     auto event_queue = std::make_shared<std::queue<std::shared_ptr<Event>>>();
     recorder.set_event_queue(event_queue);
 

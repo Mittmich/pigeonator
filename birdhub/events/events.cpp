@@ -47,6 +47,20 @@ std::vector<Detection> DetectionEvent::get_detections() const
     return detections;
 }
 
+Timestamp DetectionEvent::get_last_frame_timestamp() const
+{   
+    if (!detections.empty()) {
+        Timestamp last_frame_timestamp = Timestamp::min();
+        for (const auto& detection : detections) {
+            if (detection.get_frame_event()->get_timestamp() > last_frame_timestamp) {
+                last_frame_timestamp = detection.get_frame_event()->get_timestamp();
+            }
+        }
+        return last_frame_timestamp;
+    }
+    return Timestamp::min();
+}
+
 Detection::Detection(
     Timestamp timestamp,
     std::shared_ptr<FrameEvent> frame_event,

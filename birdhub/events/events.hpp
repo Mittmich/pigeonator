@@ -112,6 +112,7 @@ public:
     ~DetectionEvent();
     EventType type = EventType::DETECTION;
     std::vector<Detection> get_detections() const;
+    Timestamp get_last_frame_timestamp() const;
 private:
     std::vector<Detection> detections;
 };
