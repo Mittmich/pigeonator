@@ -11,10 +11,13 @@
 Recorder::Recorder(
     std::set<EventType> listening_events,
     std::shared_ptr<ImageStore> image_store,
-    const std::string& output_directory
+    const std::string& output_directory,
+    cv::Size frame_size
 ) : listening_events(listening_events), image_store(image_store), output_directory(output_directory) {
     // Create output directory if it doesn't exist
     std::filesystem::create_directories(output_directory);
+    // Set desired frame size
+    this->frame_size = frame_size;
 };
 
 Recorder::~Recorder() {
@@ -130,8 +133,9 @@ void Recorder::poll_read_queue() {
 ContinuousRecorder::ContinuousRecorder(
     std::set<EventType> listening_events,
     std::shared_ptr<ImageStore> image_store,
-    const std::string& output_directory
-) : Recorder(listening_events, image_store, output_directory) {
+    const std::string& output_directory,
+    cv::Size frame_size
+) : Recorder(listening_events, image_store, output_directory, frame_size) {
 }
 ContinuousRecorder::~ContinuousRecorder() {
     if (running) {
@@ -163,8 +167,9 @@ EventRecorder::EventRecorder(
     const std::string& output_directory,
     int slack,
     int fps,
-    int look_back_frames
-) : Recorder(listening_events, image_store, output_directory), slack(slack), fps(fps), look_back_frames(look_back_frames) {
+    int look_back_frames,
+    cv::Size frame_size
+) : Recorder(listening_events, image_store, output_directory, frame_size), slack(slack), fps(fps), look_back_frames(look_back_frames) {
 
 }
 

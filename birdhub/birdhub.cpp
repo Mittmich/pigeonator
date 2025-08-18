@@ -37,7 +37,8 @@ int main() {
         "recordings",
         150,
         30, 
-        150
+        150,
+        cv::Size(1920, 1080)
     );
 /*     auto recorder = std::make_shared<ContinuousRecorder>(
         std::set<EventType>({EventType::NEW_FRAME}),

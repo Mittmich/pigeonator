@@ -21,7 +21,8 @@ public:
     Recorder(
         std::set<EventType> listening_events,
         std::shared_ptr<ImageStore> image_store,
-        const std::string& output_directory = "."
+    const std::string& output_directory = ".",
+    cv::Size frame_size = cv::Size(1280, 720)
     );
     ~Recorder();
     std::set<EventType> listening_to() override;
@@ -58,7 +59,8 @@ public:
     ContinuousRecorder(
         std::set<EventType> listening_events,
         std::shared_ptr<ImageStore> image_store,
-        const std::string& output_directory = "."
+    const std::string& output_directory = ".",
+    cv::Size frame_size = cv::Size(1280, 720)
     );
     ~ContinuousRecorder();
 protected:
@@ -75,7 +77,8 @@ public:
         const std::string& output_directory = ".",
         int slack = 100,
         int fps = 30,
-        int look_back_frames = 3
+    int look_back_frames = 3,
+    cv::Size frame_size = cv::Size(1280, 720)
     );
     ~EventRecorder();
     void stop() override;
