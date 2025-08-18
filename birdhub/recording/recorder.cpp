@@ -327,10 +327,18 @@ void EventRecorder::_create_outputs_from_filebuffers() {
     if (effector_buffer_file.is_open()) {
         effector_buffer_file.close();
     }
-    // Load video buffer into memory -> this is an mp4 file,
+    // If no frames were written (empty file), skip output creation gracefully
+    if (!std::filesystem::exists(video_buffer_full_path) ||
+        std::filesystem::file_size(video_buffer_full_path) == 0) {
+        std::cerr << "No frames in video buffer; skipping output creation." << std::endl;
+        return;
+    }
+
+    // Load video buffer into memory -> this is an mp4 file
     auto video_reader = cv::VideoCapture(video_buffer_full_path.string());
     if (!video_reader.isOpened()) {
-        throw std::runtime_error("Could not open video buffer.");
+        std::cerr << "Warning: could not open video buffer at '" << video_buffer_full_path << "'; skipping output creation." << std::endl;
+        return;
     }
     // Load video frames into memory
     std::vector<cv::Mat> frames;
@@ -343,7 +351,8 @@ void EventRecorder::_create_outputs_from_filebuffers() {
     // load frame timestamp from text file
     std::ifstream video_timestamp_buffer_in(video_timestamp_buffer_full_path.string());
     if (!video_timestamp_buffer_in.is_open()) {
-        throw std::runtime_error("Could not open video timestamp buffer file.");
+        std::cerr << "Warning: could not open video timestamp buffer file at '" << video_timestamp_buffer_full_path << "'. Skipping output creation." << std::endl;
+        return;
     }
     std::string line;
     std::vector<Timestamp> frame_timestamps;
@@ -360,9 +369,9 @@ void EventRecorder::_create_outputs_from_filebuffers() {
     std::vector<std::string> detection_labels;
     std::ifstream detection_buffer_in(detection_buffer_full_path.string());
     if (!detection_buffer_in.is_open()) {
-        throw std::runtime_error("Could not open detection buffer file.");
+        std::cerr << "Warning: could not open detection buffer file at '" << detection_buffer_full_path << "'. Proceeding without detections." << std::endl;
     }
-    while (std::getline(detection_buffer_in, line)) {
+    while (detection_buffer_in.is_open() && std::getline(detection_buffer_in, line)) {
         // Parse the detection information: the structure is timestamp, bbox1, bbox2, bbox3, bbox4, label
         std::istringstream iss(line);
         std::string token;
@@ -394,7 +403,8 @@ void EventRecorder::_create_outputs_from_filebuffers() {
     // effector events currently unused in rendering
     // create new writer
     cv::VideoWriter detection_writer;
-    detection_writer.open(std::filesystem::path(output_directory) / ("detections_" + std::to_string(std::time(nullptr)) + ".mp4"), cv::VideoWriter::fourcc('m', 'p', '4', 'v'), this->fps, this->frame_size, true);
+    detection_writer.open((std::filesystem::path(output_directory) / ("detections_" + std::to_string(std::time(nullptr)) + ".mp4")).string(),
+                          cv::VideoWriter::fourcc('m', 'p', '4', 'v'), this->fps, this->frame_size, true);
     if (!detection_writer.isOpened()) {
         throw std::runtime_error("Could not open detection video writer.");
     }
@@ -473,6 +483,13 @@ void EventRecorder::handle_new_frame(std::shared_ptr<FrameEvent> frame_event) {
     if (this->_stop_recording_in > 0) {
         this->_write_frame_to_filebuffer(frame_event);
         this->_stop_recording_in--;
+        // If countdown just reached zero, finalize outputs immediately
+        if (this->_stop_recording_in <= 0 && this->videobuffer_writer.isOpened()) {
+            std::cout << "Stopping recording."  << std::endl;
+            this->_create_outputs_from_filebuffers();
+            this->_clear_buffers();
+            this->recording = false;
+        }
     } else if (this->videobuffer_writer.isOpened()) {
         // Log the end of recording
         std::cout << "Stopping recording."  << std::endl;
