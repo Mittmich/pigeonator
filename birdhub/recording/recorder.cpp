@@ -208,66 +208,6 @@ void EventRecorder::_clear_buffers() {
 }
 
 
-/* std::vector<FrameEvent> EventRecorder::create_detection_frames(std::shared_ptr<DetectionEvent> detection_event) {
-    std::vector<FrameEvent> detection_frames;
-    for (const auto& timestamp : detection_video_buffer) {
-        // only process timestamp is it's equal or before the last frame in the detections
-        if (timestamp <= this->last_detection_timestamp) {
-            // Create a detection frame for each timestamp in the detection video buffer
-            FrameEvent detection_frame = this->create_detection_frame(detection_event, timestamp);
-            detection_frames.push_back(detection_frame);
-        }
-    }
-    return detection_frames;
-}
- */
-FrameEvent EventRecorder::create_detection_frame(std::shared_ptr<DetectionEvent>  detection_event, Timestamp frame_timestamp) {
-    // Retrive the image from the image store
-    if (image_store->get(frame_timestamp).has_value()) {
-        cv::Mat frame = image_store->get(frame_timestamp).value();
-        // Search for the detection in the detection event that matches the frame timestamp
-        auto detections = detection_event->get_detections();
-        for (auto& detection : detections) {
-            if (detection.get_frame_event()->get_timestamp() == frame_timestamp) {
-                // Draw bounding boxes on the frame if available
-                auto bounding_boxes_opt = detection.get_bounding_boxes();
-                auto labels_opt = detection.get_labels(); 
-
-                if (bounding_boxes_opt.has_value()) {
-                    const auto& boxes_vec = bounding_boxes_opt.value();
-                    std::vector<std::string> labels_vec;
-                    if (labels_opt.has_value()) {
-                        labels_vec = labels_opt.value();
-                    }
-
-                    for (size_t i = 0; i < boxes_vec.size(); ++i) {
-                        const auto& box = boxes_vec[i];
-                        // Draw the bounding box with red lines (BGR format), thickness 5
-                        cv::rectangle(frame, box, cv::Scalar(0, 0, 255), 5);
-
-                        if (i < labels_vec.size() && !labels_vec[i].empty()) {
-                            const std::string& label_text = labels_vec[i];
-                            // Position text near the top-left of the box, or adjust as needed
-                            // Python: (x1, y2 + 15) -> (box.tl().x, box.br().y + 15)
-                            cv::Point text_origin(box.tl().x, box.br().y + 15);
-                            cv::putText(frame, label_text, text_origin, cv::FONT_HERSHEY_SIMPLEX, 1.0, cv::Scalar(255, 255, 255), 1); // White text, thickness 1
-                        }
-                    }
-                }
-            }
-        }
-        // Put the modified image back to the store so _write_detections uses it
-        image_store->put(frame_timestamp, frame);
-    }
-    return FrameEvent(
-        frame_timestamp,
-        std::make_optional<std::map<std::string, std::string>>({
-            {"type", "detection_frame"},
-            {"detection_count", std::to_string(detection_event->get_detections().size())}
-        })
-    );
-}
-
 
 void EventRecorder::_write_frame_to_filebuffer(std::shared_ptr<FrameEvent> frame_event) {
     if (videobuffer_writer.isOpened()) {

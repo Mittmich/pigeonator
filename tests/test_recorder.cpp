@@ -389,12 +389,7 @@ public:
         int fps = 30,
         int look_back_frames = 3
     ) : EventRecorder(listening_events, image_store, output_directory, slack, fps, look_back_frames) {}
-    
-    // Expose protected methods for testing
-    FrameEvent test_create_detection_frame(std::shared_ptr<DetectionEvent> detection_event, Timestamp frame_timestamp) {
-        return create_detection_frame(detection_event, frame_timestamp);
-    }
-    
+
     
     void test_handle_new_frame(std::shared_ptr<FrameEvent> event) {
         handle_new_frame(event);
@@ -417,33 +412,6 @@ TEST_CASE("EventRecorder constructor initializes with custom parameters") {
     EventRecorder recorder(events, image_store, temp_dir, 50, 25, 5);
     
     CHECK(recorder.listening_to() == events);
-    
-    cleanup_directory(temp_dir);
-}
-
-TEST_CASE("EventRecorder creates detection frame with bounding boxes") {
-    std::set<EventType> events = {EventType::NEW_FRAME, EventType::DETECTION};
-    auto image_store = std::make_shared<ImageStore>(50);
-    std::string temp_dir = create_temp_directory();
-    
-    TestableEventRecorder recorder(events, image_store, temp_dir);
-    
-    // Setup test image and detection
-    Timestamp timestamp = test_now();
-    cv::Mat test_image = create_video_image(100, 100);
-    image_store->put(timestamp, test_image);
-    
-    auto frame_event = std::make_shared<FrameEvent>(timestamp, std::nullopt);
-    auto detection_event = std::make_shared<DetectionEvent>(create_test_detection_event(timestamp));
-    
-    // Create detection frame
-    FrameEvent detection_frame = recorder.test_create_detection_frame(detection_event, timestamp);
-    
-    CHECK(detection_frame.get_timestamp() == timestamp);
-    CHECK(detection_frame.get_meta_data().count("type") > 0);
-    CHECK(detection_frame.get_meta_data().at("type") == "detection_frame");
-    CHECK(detection_frame.get_meta_data().count("detection_count") > 0);
-    CHECK(detection_frame.get_meta_data().at("detection_count") == "1");
     
     cleanup_directory(temp_dir);
 }
@@ -540,7 +508,6 @@ TEST_CASE("EventRecorder handles effector action events") {
     cleanup_directory(temp_dir);
 }
 
-// Removed obsolete test that depended on now-removed create_detection_frames implementation.
 
 TEST_CASE("EventRecorder handles missing image in store gracefully") {
     std::set<EventType> events = {EventType::NEW_FRAME, EventType::DETECTION};
