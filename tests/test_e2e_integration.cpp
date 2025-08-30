@@ -156,9 +156,9 @@ std::string create_test_video_with_motion_and_birds(const std::string& filename,
 
 TEST_CASE("E2E Integration Test - Motion Activated Bird Detection Pipeline") {
     
-    SUBCASE("Test bird detections emitted") {
+    SUBCASE("Test motion detections emitted") {
         // This subcase will be used when the user provides actual video files
-        std::string test_dir = "tests/e2e_video_output/";
+        std::string test_dir = "tests/e2e_video_output/motion/";
         // Placeholder path - user will supply this later
         std::string user_video_path = "tests/test_videos/20250813_173458.mp4";
         
@@ -177,10 +177,79 @@ TEST_CASE("E2E Integration Test - Motion Activated Bird Detection Pipeline") {
             auto video_capture = std::make_unique<VideoFileCapture>(user_video_path);
             auto video_stream = std::make_shared<Stream>(image_store, video_capture.get());
             
-            // Same setup as previous test...
             auto motion_detector = std::make_shared<MotionDetector>(
                 image_store, 24, 21, 5, 100, 0, std::chrono::seconds(100)
             );
+            
+            
+            auto video_recorder = std::make_shared<EventRecorder>(
+                std::set<EventType>({EventType::NEW_FRAME, EventType::DETECTION}),
+                image_store,
+                test_dir,
+                300,
+                10, 
+                300
+            );
+
+            auto mock_subscriber = std::make_shared<MockSubscriber>();
+            
+            VideoEventManager event_manager(*video_stream);
+            event_manager.add_subscriber(motion_detector);
+            event_manager.add_subscriber(video_recorder);
+            event_manager.add_subscriber(mock_subscriber);
+            
+            // Run pipeline for user video
+            std::thread pipeline_thread([&event_manager]() {
+                event_manager.run();
+            });
+            
+            // Let it run longer for user videos which might be longer
+            std::this_thread::sleep_for(std::chrono::seconds(3));
+            
+            event_manager.stop();
+
+            if (pipeline_thread.joinable()) {
+                pipeline_thread.join();
+            }
+            // Let it run longer for user videos which might be longer
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+            // Verify results
+            print_event_summary(*mock_subscriber);
+            CHECK(mock_subscriber->received_events.size() > 0);
+            // Check that bird detections were emitted
+            CHECK(get_event_count_by_type(*mock_subscriber, EventType::DETECTION) > 0);
+            // Check that there was a motion detected
+            auto labels = get_all_detection_labels(*mock_subscriber);
+            CHECK(std::find(labels.begin(), labels.end(), "motion") != labels.end());
+
+            INFO("User video processing completed successfully");
+            
+        } catch (const std::exception& e) {
+            FAIL("Failed to process user video: " << e.what());
+        }
+    }
+
+
+    SUBCASE("Test bird detections emitted") {
+        // This subcase will be used when the user provides actual video files
+        std::string test_dir = "tests/e2e_video_output/birds/";
+        // Placeholder path - user will supply this later
+        std::string user_video_path = "tests/test_videos/20250813_173458.mp4";
+        
+        INFO("Placeholder for user-supplied video: " << user_video_path);
+        
+        // Skip this test if user video doesn't exist yet
+        if (!std::filesystem::exists(user_video_path)) {
+            INFO("User-supplied video not found, skipping test");
+            return;
+        }
+        
+        // Set up same pipeline as above but with user video
+        auto image_store = std::make_shared<ImageStore>(800);
+        
+        try {
+            auto video_capture = std::make_unique<VideoFileCapture>(user_video_path);
+            auto video_stream = std::make_shared<Stream>(image_store, video_capture.get());
             
             auto bird_detector = std::make_shared<BirdDetectorYolov5>(
                 image_store, "weights/bh_v3.onnx", cv::Size(640, 640), 
@@ -233,9 +302,182 @@ TEST_CASE("E2E Integration Test - Motion Activated Bird Detection Pipeline") {
             FAIL("Failed to process user video: " << e.what());
         }
     }
-    
-    // Clean up test directory
-    //if (std::filesystem::exists(test_dir)) {
-    //    std::filesystem::remove_all(test_dir);
-    //}
+
+    SUBCASE("Test single class sequence detection") {
+        // This subcase will be used when the user provides actual video files
+        std::string test_dir = "tests/e2e_video_output/single_class/";
+        // Placeholder path - user will supply this later
+        std::string user_video_path = "tests/test_videos/20250813_173458.mp4";
+        
+        INFO("Placeholder for user-supplied video: " << user_video_path);
+        
+        // Skip this test if user video doesn't exist yet
+        if (!std::filesystem::exists(user_video_path)) {
+            INFO("User-supplied video not found, skipping test");
+            return;
+        }
+        
+        // Set up same pipeline as above but with user video
+        auto image_store = std::make_shared<ImageStore>(800);
+        
+        try {
+            auto video_capture = std::make_unique<VideoFileCapture>(user_video_path);
+            auto video_stream = std::make_shared<Stream>(image_store, video_capture.get());
+            
+            auto bird_detector = std::make_shared<BirdDetectorYolov5>(
+                image_store, "weights/bh_v3.onnx", cv::Size(640, 640), 
+                0.25f, 0.45f, std::chrono::seconds(500), 50
+            );
+            
+            auto single_class_sequence_detector = std::make_shared<SingleClassSequenceDetector>(
+                bird_detector,
+                image_store,
+                3, // minimum_number_detections
+                0.3f, // iou_threshold
+                5, // max_frames_without_detection
+                100.0f // max_path_length_threshold
+            );
+
+            auto video_recorder = std::make_shared<EventRecorder>(
+                std::set<EventType>({EventType::NEW_FRAME, EventType::DETECTION}),
+                image_store,
+                test_dir,
+                300,
+                10, 
+                300
+            );
+
+            auto mock_subscriber = std::make_shared<MockSubscriber>();
+            
+            VideoEventManager event_manager(*video_stream);
+            event_manager.add_subscriber(single_class_sequence_detector);
+            event_manager.add_subscriber(video_recorder);
+            event_manager.add_subscriber(mock_subscriber);
+            
+            // Run pipeline for user video
+            std::thread pipeline_thread([&event_manager]() {
+                event_manager.run();
+            });
+            
+            // Let it run longer for user videos which might be longer
+            std::this_thread::sleep_for(std::chrono::seconds(5));
+            
+            event_manager.stop();
+
+            if (pipeline_thread.joinable()) {
+                pipeline_thread.join();
+            }
+            // Let it run longer for user videos which might be longer
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+            // Verify results
+            print_event_summary(*mock_subscriber);
+            CHECK(mock_subscriber->received_events.size() > 0);
+            // Check that bird detections were emitted
+            CHECK(get_event_count_by_type(*mock_subscriber, EventType::DETECTION) > 0);
+            // Check that there was a pigeon detected
+            auto labels = get_all_detection_labels(*mock_subscriber);
+            CHECK(std::find(labels.begin(), labels.end(), "Pigeon") != labels.end());
+
+            INFO("User video processing completed successfully");
+            
+        } catch (const std::exception& e) {
+            FAIL("Failed to process user video: " << e.what());
+        }
+    }
+
+    SUBCASE("Motion activated single class sequence detection") {
+        // This subcase will be used when the user provides actual video files
+        std::string test_dir = "tests/e2e_video_output/motion_activated/";
+        // Placeholder path - user will supply this later
+        std::string user_video_path = "tests/test_videos/20250813_173458.mp4";
+        
+        INFO("Placeholder for user-supplied video: " << user_video_path);
+        
+        // Skip this test if user video doesn't exist yet
+        if (!std::filesystem::exists(user_video_path)) {
+            INFO("User-supplied video not found, skipping test");
+            return;
+        }
+        
+        // Set up same pipeline as above but with user video
+        auto image_store = std::make_shared<ImageStore>(800);
+        
+        try {
+            auto video_capture = std::make_unique<VideoFileCapture>(user_video_path);
+            auto video_stream = std::make_shared<Stream>(image_store, video_capture.get());
+            
+            auto motion_detector = std::make_shared<MotionDetector>(
+                image_store, 24, 21, 5, 100, 0, std::chrono::seconds(100)
+            );
+
+            auto bird_detector = std::make_shared<BirdDetectorYolov5>(
+                image_store, "weights/bh_v3.onnx", cv::Size(640, 640), 
+                0.25f, 0.45f, std::chrono::seconds(500), 50
+            );
+            
+            auto single_class_sequence_detector = std::make_shared<SingleClassSequenceDetector>(
+                bird_detector,
+                image_store,
+                3, // minimum_number_detections
+                0.3f, // iou_threshold
+                5, // max_frames_without_detection
+                100.0f // max_path_length_threshold
+            );
+
+            auto motion_activated_detector = std::make_shared<MotionActivatedDetector>(
+                motion_detector,
+                single_class_sequence_detector,
+                image_store,
+                3,
+                5
+            );
+
+            auto video_recorder = std::make_shared<EventRecorder>(
+                std::set<EventType>({EventType::NEW_FRAME, EventType::DETECTION}),
+                image_store,
+                test_dir,
+                300,
+                10, 
+                300
+            );
+
+            auto mock_subscriber = std::make_shared<MockSubscriber>();
+            
+            VideoEventManager event_manager(*video_stream);
+            event_manager.add_subscriber(motion_activated_detector);
+            event_manager.add_subscriber(video_recorder);
+            event_manager.add_subscriber(mock_subscriber);
+            
+            // Run pipeline for user video
+            std::thread pipeline_thread([&event_manager]() {
+                event_manager.run();
+            });
+            
+            // Let it run longer for user videos which might be longer
+            std::this_thread::sleep_for(std::chrono::seconds(5));
+            
+            event_manager.stop();
+
+            if (pipeline_thread.joinable()) {
+                pipeline_thread.join();
+            }
+            // Let it run longer for user videos which might be longer
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+            // Verify results
+            print_event_summary(*mock_subscriber);
+            CHECK(mock_subscriber->received_events.size() > 0);
+            // Check that bird detections were emitted
+            CHECK(get_event_count_by_type(*mock_subscriber, EventType::DETECTION) > 0);
+            // Check that there was a pigeon detected
+            auto labels = get_all_detection_labels(*mock_subscriber);
+            CHECK(std::find(labels.begin(), labels.end(), "Pigeon") != labels.end());
+
+            INFO("User video processing completed successfully");
+            
+        } catch (const std::exception& e) {
+            FAIL("Failed to process user video: " << e.what());
+        }
+    }
+
+
 }
