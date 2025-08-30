@@ -184,7 +184,7 @@ TEST_CASE("E2E Integration Test - Motion Activated Bird Detection Pipeline") {
             
             auto bird_detector = std::make_shared<BirdDetectorYolov5>(
                 image_store, "weights/bh_v3.onnx", cv::Size(640, 640), 
-                0.1f, 0.2f, std::chrono::seconds(500), 0
+                0.25f, 0.45f, std::chrono::seconds(500), 50
             );
             
             auto motion_activated_detector = std::make_shared<MotionActivatedDetector>(
@@ -209,7 +209,7 @@ TEST_CASE("E2E Integration Test - Motion Activated Bird Detection Pipeline") {
             auto mock_subscriber = std::make_shared<MockSubscriber>();
             
             VideoEventManager event_manager(*video_stream);
-            event_manager.add_subscriber(motion_detector);
+            event_manager.add_subscriber(bird_detector);
             event_manager.add_subscriber(video_recorder);
             event_manager.add_subscriber(mock_subscriber);
             
@@ -219,7 +219,7 @@ TEST_CASE("E2E Integration Test - Motion Activated Bird Detection Pipeline") {
             });
             
             // Let it run longer for user videos which might be longer
-            std::this_thread::sleep_for(std::chrono::seconds(20));
+            std::this_thread::sleep_for(std::chrono::seconds(50));
             
             event_manager.stop();
 
