@@ -156,7 +156,7 @@ std::string create_test_video_with_motion_and_birds(const std::string& filename,
 
 TEST_CASE("E2E Integration Test - Motion Activated Bird Detection Pipeline") {
     
-    SUBCASE("Pipeline with user-supplied video file - placeholder") {
+    SUBCASE("Test bird detections emitted") {
         // This subcase will be used when the user provides actual video files
         std::string test_dir = "tests/e2e_video_output/";
         // Placeholder path - user will supply this later
@@ -187,10 +187,6 @@ TEST_CASE("E2E Integration Test - Motion Activated Bird Detection Pipeline") {
                 0.25f, 0.45f, std::chrono::seconds(500), 50
             );
             
-            auto motion_activated_detector = std::make_shared<MotionActivatedDetector>(
-                motion_detector, bird_detector, image_store, 5, 10
-            );
-            
             auto video_recorder = std::make_shared<EventRecorder>(
                 std::set<EventType>({EventType::NEW_FRAME, EventType::DETECTION}),
                 image_store,
@@ -198,12 +194,6 @@ TEST_CASE("E2E Integration Test - Motion Activated Bird Detection Pipeline") {
                 300,
                 10, 
                 300
-            );
-
-            auto continuous_recorder = std::make_shared<ContinuousRecorder>(
-                std::set<EventType>({EventType::NEW_FRAME}),
-                image_store,
-                test_dir
             );
 
             auto mock_subscriber = std::make_shared<MockSubscriber>();
@@ -219,7 +209,7 @@ TEST_CASE("E2E Integration Test - Motion Activated Bird Detection Pipeline") {
             });
             
             // Let it run longer for user videos which might be longer
-            std::this_thread::sleep_for(std::chrono::seconds(50));
+            std::this_thread::sleep_for(std::chrono::seconds(5));
             
             event_manager.stop();
 
@@ -227,11 +217,16 @@ TEST_CASE("E2E Integration Test - Motion Activated Bird Detection Pipeline") {
                 pipeline_thread.join();
             }
             // Let it run longer for user videos which might be longer
-            std::this_thread::sleep_for(std::chrono::seconds(5));
+            std::this_thread::sleep_for(std::chrono::seconds(1));
             // Verify results
             print_event_summary(*mock_subscriber);
             CHECK(mock_subscriber->received_events.size() > 0);
-            
+            // Check that bird detections were emitted
+            CHECK(get_event_count_by_type(*mock_subscriber, EventType::DETECTION) > 0);
+            // Check that there was a pigeon detected
+            auto labels = get_all_detection_labels(*mock_subscriber);
+            CHECK(std::find(labels.begin(), labels.end(), "Pigeon") != labels.end());
+
             INFO("User video processing completed successfully");
             
         } catch (const std::exception& e) {
