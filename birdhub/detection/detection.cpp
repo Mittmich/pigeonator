@@ -763,6 +763,8 @@ bool ObjectTracker::should_drop_track_for_path_length(Track& track, const cv::Po
         track.total_detections_in_track = 0;
         track.trajectory.clear();
         track.trajectory.push_back(new_center);
+    track.detections_in_track.clear();
+    track.emitted_detections_count = 0; // allow consensus to be re-earned cleanly
         return false; // Don't drop, but reset
     }
     
@@ -807,6 +809,19 @@ void ObjectTracker::remove_track(int track_id) {
             }),
         active_tracks.end()
     );
+}
+
+void ObjectTracker::mark_detections_emitted(int track_id, size_t new_total_emitted) {
+    for (auto & track : active_tracks) {
+        if (track.track_id == track_id) {
+            // Safety: clamp to size
+            if (new_total_emitted > track.detections_in_track.size()) {
+                new_total_emitted = track.detections_in_track.size();
+            }
+            track.emitted_detections_count = new_total_emitted;
+            break;
+        }
+    }
 }
 
 float ObjectTracker::calculate_distance(const cv::Point2f& p1, const cv::Point2f& p2) const {
@@ -867,21 +882,30 @@ std::optional<DetectionEvent> SingleClassSequenceDetector::detect(
     std::vector<Track> consensus_tracks = tracker->get_tracks_with_consensus(minimum_number_detections);
     
     if (!consensus_tracks.empty()) {
-        // Build consensus detections based on all contributing frames per track
-        std::vector<Detection> all_consensus_detections;
-        for (const auto& track : consensus_tracks) {
-            // Rewrite all detections in this track to the consensus class and bbox
-            auto rewritten = rewrite_track_detections_to_consensus(track.detections_in_track, track, frame_event->get_timestamp());
-            all_consensus_detections.insert(all_consensus_detections.end(), rewritten.begin(), rewritten.end());
+        // Incremental emission: only emit new detections not yet emitted per track
+        std::vector<Detection> incremental_consensus_detections;
+        for (const auto & track_snapshot : consensus_tracks) {
+            // track_snapshot is a copy; we need emitted_detections_count from the active track
+            size_t already_emitted = track_snapshot.emitted_detections_count; // copy has the value at snapshot time
+            if (already_emitted >= track_snapshot.detections_in_track.size()) {
+                continue; // nothing new
+            }
+            // Slice of new detections
+            std::vector<Detection> new_slice(
+                track_snapshot.detections_in_track.begin() + static_cast<long>(already_emitted),
+                track_snapshot.detections_in_track.end()
+            );
+            auto rewritten = rewrite_track_detections_to_consensus(new_slice, track_snapshot, frame_event->get_timestamp());
+            if (!rewritten.empty()) {
+                incremental_consensus_detections.insert(incremental_consensus_detections.end(), rewritten.begin(), rewritten.end());
+                // Mark emitted in live tracker
+                tracker->mark_detections_emitted(track_snapshot.track_id, track_snapshot.detections_in_track.size());
+            }
         }
-
-        if (!all_consensus_detections.empty()) {
-            // Clean up processed tracks (remove them from active tracking)
-            cleanup_completed_tracks(consensus_tracks);
-
+        if (!incremental_consensus_detections.empty()) {
             return DetectionEvent(
                 frame_event->get_timestamp(),
-                all_consensus_detections
+                incremental_consensus_detections
             );
         }
     }

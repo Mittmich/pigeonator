@@ -132,6 +132,8 @@ struct Track {
     Timestamp last_detection_time;
     // Keep the contributing detections for this track so we can emit one per frame upon consensus
     std::vector<Detection> detections_in_track;
+    // Number of detections already emitted as consensus events (incremental emission support)
+    size_t emitted_detections_count = 0;
     
     Track(int id, const cv::Rect& bbox, Timestamp timestamp);
     std::string get_most_likely_class() const;
@@ -153,6 +155,8 @@ public:
     std::vector<Track> get_all_active_tracks() const;
     void remove_track(int track_id);
     void prune_tracks();
+    // Mark that a track has emitted detections up to new_total_emitted (exclusive index into detections_in_track)
+    void mark_detections_emitted(int track_id, size_t new_total_emitted);
     
 private:
     std::vector<Track> active_tracks;

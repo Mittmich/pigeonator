@@ -581,3 +581,76 @@ TEST_CASE("SingleClassSequenceDetector - Stress Test with Many Tracks") {
         INFO("Total consensus events: " << total_consensus_events);
     }
 }
+
+TEST_CASE("SingleClassSequenceDetector - Incremental Emission After Consensus") {
+    // Verifies that once consensus is reached, subsequent frames emit only new detections
+    // and previously emitted detections are not re-emitted (no duplicates).
+    auto image_store = std::make_shared<ImageStore>(30);
+    auto mock_detector = std::make_shared<MockDetector>(image_store);
+
+    const int min_detections = 3;
+    SingleClassSequenceDetector sequence_detector(
+        mock_detector,
+        image_store,
+        min_detections, // minimum_number_detections
+        0.5f,
+        10,
+        200.0f
+    );
+
+    mock_detector->should_return_detection = true;
+
+    const int total_frames = 6; // frames 0..5
+    std::vector<std::optional<DetectionEvent>> events;
+    std::vector<Timestamp> frame_timestamps;
+    auto base_time = test_now();
+
+    for (int i = 0; i < total_frames; ++i) {
+        // Slight movement to stay within same track
+        int x = 100 + i * 5;
+        int y = 120 + i * 3;
+        cv::Mat img = create_pigeon_track_image(x, y, i);
+        Timestamp ts = base_time + std::chrono::milliseconds(i * 100);
+        frame_timestamps.push_back(ts);
+        image_store->put(ts, img);
+
+        mock_detector->clear_mock_detections();
+        cv::Rect bbox(x - 15, y - 10, 30, 20);
+        mock_detector->add_mock_detection("pigeon", 0.80f + i * 0.01f, bbox);
+
+        auto frame_event = std::make_shared<FrameEvent>(ts, std::nullopt);
+        auto result = sequence_detector.detect(frame_event);
+        if (result.has_value()) {
+            events.push_back(result);
+        }
+    }
+
+    // Expect first consensus at frame index (min_detections - 1) and then one event per subsequent frame
+    int expected_events = total_frames - min_detections + 1; // 6 - 3 + 1 = 4
+    REQUIRE(events.size() == expected_events);
+
+    // First event should bundle the initial consensus length detections
+    {
+        auto detections = events[0].value().get_detections();
+        CHECK(detections.size() == min_detections);
+    }
+    // Subsequent events should each have exactly 1 new detection
+    for (size_t ei = 1; ei < events.size(); ++ei) {
+        auto detections = events[ei].value().get_detections();
+        CHECK(detections.size() == 1);
+    }
+
+    // Collect all emitted detection timestamps and ensure uniqueness == total_frames
+    std::set<long long> emitted_ms;
+    int total_emitted = 0;
+    for (const auto & ev_opt : events) {
+        auto detections = ev_opt.value().get_detections();
+        for (const auto & d : detections) {
+            long long ms = std::chrono::duration_cast<std::chrono::milliseconds>(d.get_timestamp().time_since_epoch()).count();
+            emitted_ms.insert(ms);
+            total_emitted++;
+        }
+    }
+    CHECK(total_emitted == total_frames);            // We emitted exactly one per frame overall (3 + 1 + 1 + 1)
+    CHECK(emitted_ms.size() == total_frames);       // No duplicates
+}
