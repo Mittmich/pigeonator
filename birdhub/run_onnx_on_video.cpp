@@ -15,7 +15,7 @@
 namespace fs = std::filesystem;
 
 struct Args {
-    std::string video_path = "tests/test_videos/20250813_173458.mp4";
+    std::string video_path = "tests/test_videos/video_with_single_flying_bird.mp4";
     std::string weights_path = "weights/bh_v3.onnx";
     std::string out_dir = "output_cpp";
     int imgsz = 640;

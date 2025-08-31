@@ -154,21 +154,13 @@ std::string create_test_video_with_motion_and_birds(const std::string& filename,
     return full_path;
 }
 
-TEST_CASE("E2E Integration Test - Motion Activated Bird Detection Pipeline") {
+TEST_CASE("E2E Integration Test - Detection Pipeline") {
     
     SUBCASE("Test motion detections emitted") {
         // This subcase will be used when the user provides actual video files
         std::string test_dir = "tests/e2e_video_output/motion/";
         // Placeholder path - user will supply this later
-        std::string user_video_path = "tests/test_videos/20250813_173458.mp4";
-        
-        INFO("Placeholder for user-supplied video: " << user_video_path);
-        
-        // Skip this test if user video doesn't exist yet
-        if (!std::filesystem::exists(user_video_path)) {
-            INFO("User-supplied video not found, skipping test");
-            return;
-        }
+        std::string user_video_path = "tests/test_videos/video_with_single_sitting_bird.mp4";
         
         // Set up same pipeline as above but with user video
         auto image_store = std::make_shared<ImageStore>(800);
@@ -234,15 +226,7 @@ TEST_CASE("E2E Integration Test - Motion Activated Bird Detection Pipeline") {
         // This subcase will be used when the user provides actual video files
         std::string test_dir = "tests/e2e_video_output/birds/";
         // Placeholder path - user will supply this later
-        std::string user_video_path = "tests/test_videos/20250813_173458.mp4";
-        
-        INFO("Placeholder for user-supplied video: " << user_video_path);
-        
-        // Skip this test if user video doesn't exist yet
-        if (!std::filesystem::exists(user_video_path)) {
-            INFO("User-supplied video not found, skipping test");
-            return;
-        }
+        std::string user_video_path = "tests/test_videos/video_with_single_sitting_bird.mp4";
         
         // Set up same pipeline as above but with user video
         auto image_store = std::make_shared<ImageStore>(800);
@@ -307,15 +291,7 @@ TEST_CASE("E2E Integration Test - Motion Activated Bird Detection Pipeline") {
         // This subcase will be used when the user provides actual video files
         std::string test_dir = "tests/e2e_video_output/single_class/";
         // Placeholder path - user will supply this later
-        std::string user_video_path = "tests/test_videos/20250813_173458.mp4";
-        
-        INFO("Placeholder for user-supplied video: " << user_video_path);
-        
-        // Skip this test if user video doesn't exist yet
-        if (!std::filesystem::exists(user_video_path)) {
-            INFO("User-supplied video not found, skipping test");
-            return;
-        }
+        std::string user_video_path = "tests/test_videos/video_with_single_sitting_bird.mp4";
         
         // Set up same pipeline as above but with user video
         auto image_store = std::make_shared<ImageStore>(800);
@@ -389,15 +365,7 @@ TEST_CASE("E2E Integration Test - Motion Activated Bird Detection Pipeline") {
         // This subcase will be used when the user provides actual video files
         std::string test_dir = "tests/e2e_video_output/motion_activated/";
         // Placeholder path - user will supply this later
-        std::string user_video_path = "tests/test_videos/20250813_173458.mp4";
-        
-        INFO("Placeholder for user-supplied video: " << user_video_path);
-        
-        // Skip this test if user video doesn't exist yet
-        if (!std::filesystem::exists(user_video_path)) {
-            INFO("User-supplied video not found, skipping test");
-            return;
-        }
+        std::string user_video_path = "tests/test_videos/video_with_single_sitting_bird.mp4";
         
         // Set up same pipeline as above but with user video
         auto image_store = std::make_shared<ImageStore>(800);
