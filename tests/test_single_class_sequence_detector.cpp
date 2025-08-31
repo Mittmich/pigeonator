@@ -206,6 +206,7 @@ TEST_CASE("SingleClassSequenceDetector - Single Track Consensus") {
         auto detection = detections[0];
         auto labels = detection.get_labels();
         auto meta_data = detection.get_meta_data();
+    auto track_uuids = detection.get_track_uuids();
         
         REQUIRE(labels.has_value());
         CHECK(labels.value()[0] == "pigeon");
@@ -214,6 +215,15 @@ TEST_CASE("SingleClassSequenceDetector - Single Track Consensus") {
         CHECK(meta_data.value()["detector_type"] == "SingleClassSequenceDetector");
         CHECK(meta_data.value()["most_likely_object"] == "pigeon");
         CHECK(meta_data.value()["detection_type"] == "track_consensus");
+    REQUIRE(track_uuids.has_value());
+    CHECK(track_uuids.value().size() == labels.value().size());
+    // basic UUID format check 8-4-4-4-12 hex
+    std::string uuid = track_uuids.value()[0];
+    CHECK(uuid.size() == 36);
+    CHECK(uuid[8] == '-');
+    CHECK(uuid[13] == '-');
+    CHECK(uuid[18] == '-');
+    CHECK(uuid[23] == '-');
     }
     
     SUBCASE("Mixed class detections should converge to highest confidence") {
@@ -308,6 +318,9 @@ TEST_CASE("SingleClassSequenceDetector - Multi-Track Scenario") {
                     auto meta_data = detection.get_meta_data();
                     REQUIRE(meta_data.has_value());
                     CHECK(meta_data.value()["detection_type"] == "track_consensus");
+                    auto tus = detection.get_track_uuids();
+                    REQUIRE(tus.has_value());
+                    CHECK(tus.value().size() == detection.get_labels().value().size());
                 }
             }
         }

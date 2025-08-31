@@ -8,6 +8,8 @@
 #include <cmath>
 #include <memory>
 #include <deque>
+#include <random>
+#include <sstream>
 
 Detector::Detector(
     std::set<EventType> listening_events,
@@ -528,8 +530,45 @@ float ClassStatistics::get_weighted_score() const {
 }
 
 // Track implementation
+namespace {
+std::string generate_uuid_v4() {
+    static thread_local std::mt19937_64 rng{std::random_device{}()};
+    std::uniform_int_distribution<uint64_t> dist(0, std::numeric_limits<uint64_t>::max());
+    auto to_hex = [](uint64_t value, int width) {
+        std::ostringstream oss;
+        oss << std::hex;
+        oss.width(width);
+        oss.fill('0');
+        oss << (value & ((1ULL << (width*4)) - 1));
+        return oss.str();
+    };
+    // Compose 128 bits from two 64-bit draws
+    uint64_t part1 = dist(rng);
+    uint64_t part2 = dist(rng);
+    // Set version (4) and variant (10xx)
+    // version field: bits 12-15 of time_hi_and_version
+    part2 &= 0xFFFFFFFFFFFF0FFFULL;
+    part2 |= 0x0000000000004000ULL;
+    // variant in clock_seq_hi_and_reserved (bits 6-7) -> 10
+    part2 &= 0x3FFFFFFFFFFFFFFFULL;
+    part2 |= 0x8000000000000000ULL;
+    // Build string (8-4-4-4-12)
+    // Use segments from parts; we map sequentially.
+    std::ostringstream uuid;
+    uuid << to_hex(part1 >> 32, 8) << "-"
+         << to_hex((part1 >> 16) & 0xFFFF, 4) << "-"
+         << to_hex(part1 & 0xFFFF, 4) << "-"
+         << to_hex(part2 >> 48, 4) << "-"
+         << to_hex(part2 & 0xFFFFFFFFFFFFULL, 12);
+    std::string s = uuid.str();
+    // ensure lowercase
+    std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c){ return std::tolower(c); });
+    return s;
+}
+}
+
 Track::Track(int id, const cv::Rect& bbox, Timestamp timestamp) 
-    : track_id(id), last_bbox(bbox), frames_since_last_detection(0), 
+    : track_id(id), track_uuid(generate_uuid_v4()), last_bbox(bbox), frames_since_last_detection(0), 
       total_detections_in_track(0), last_detection_time(timestamp) {
     last_center = cv::Point2f(bbox.x + bbox.width/2.0f, bbox.y + bbox.height/2.0f);
     trajectory.push_back(last_center);
@@ -871,7 +910,8 @@ std::vector<Detection> SingleClassSequenceDetector::rewrite_track_detections_to_
             std::vector<float>{mean_conf},
             std::vector<cv::Rect>{consensus_track.last_bbox},
             std::vector<int>{consensus_track.last_bbox.area()},
-            meta_data
+            meta_data,
+            std::vector<std::string>{consensus_track.track_uuid}
         );
         rewritten.push_back(consensus_detection);
     }

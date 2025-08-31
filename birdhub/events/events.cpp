@@ -68,14 +68,16 @@ Detection::Detection(
     std::optional<std::vector<float>> confidences,
     std::optional<std::vector<cv::Rect>> bounding_boxes,
     std::optional<std::vector<int>> detection_areas,
-    std::optional<std::map<std::string, std::string>> meta_data)
+        std::optional<std::map<std::string, std::string>> meta_data,
+        std::optional<std::vector<std::string>> track_uuids)
     : timestamp(timestamp),
       frame_event(frame_event),
       labels(labels),
       confidences(confidences),
       bounding_boxes(bounding_boxes),
       detection_areas(detection_areas),
-      meta_data(meta_data) {};
+            meta_data(meta_data),
+            track_uuids(track_uuids) {};
 
 Detection::~Detection() = default;
 
@@ -113,5 +115,9 @@ Timestamp Detection::get_timestamp() const
 std::optional<std::map<std::string, std::string>> Detection::get_meta_data() const
 {
     return meta_data;
+}
+
+std::optional<std::vector<std::string>> Detection::get_track_uuids() const {
+    return track_uuids;
 }
 

@@ -6,6 +6,7 @@
 #include <fstream>
 #include <sstream>
 #include <vector>
+#include <unordered_map>
 
 
 Recorder::Recorder(
@@ -228,15 +229,24 @@ void EventRecorder::_write_detections_to_filebuffer(std::shared_ptr<DetectionEve
             // Iterate over all labels and bounding boxes and write them to the file with the same timestamp
             auto labels = detection.get_labels();
             auto boxes = detection.get_bounding_boxes();
+            auto track_uuids = detection.get_track_uuids();
             if (boxes.has_value() && labels.has_value()) {
                 auto boxes_vec = boxes.value();
                 auto labels_vec = labels.value();
+                std::vector<std::string> uuid_vec;
+                if (track_uuids.has_value()) {
+                    uuid_vec = track_uuids.value();
+                }
                 for (size_t i = 0; i < boxes_vec.size(); ++i) {
                     const auto& box = boxes_vec[i];
                     const auto& label = labels_vec[i];
                     detection_buffer_file << detection.get_frame_event()->get_timestamp().time_since_epoch().count() << ","
                                           << box.x << "," << box.y << "," << box.width << "," << box.height << ","
-                                          << label << std::endl;
+                                          << label;
+                    if (!uuid_vec.empty() && i < uuid_vec.size()) {
+                        detection_buffer_file << "," << uuid_vec[i];
+                    }
+                    detection_buffer_file << std::endl;
                 }
             }
         }
@@ -312,6 +322,7 @@ void EventRecorder::_create_outputs_from_filebuffers() {
     std::vector<Timestamp> detection_timestamps;
     std::vector<std::vector<int>> detection_bounding_boxes;
     std::vector<std::string> detection_labels;
+    std::vector<std::string> detection_track_uuids; // optional parallel vector (empty string if none)
     std::ifstream detection_buffer_in(detection_buffer_full_path.string());
     if (!detection_buffer_in.is_open()) {
         std::cerr << "Warning: could not open detection buffer file at '" << detection_buffer_full_path << "'. Proceeding without detections." << std::endl;
@@ -324,23 +335,26 @@ void EventRecorder::_create_outputs_from_filebuffers() {
         while (std::getline(iss, token, ',')) {
             tokens.push_back(token);
         }
-        if (tokens.size() != 6) {
-            std::cerr << "Invalid detection line: " << line << std::endl;
+        if (tokens.size() == 6 || tokens.size() == 7) {
+            // Extract the detection information
+            Timestamp detection_timestamp = std::chrono::time_point<std::chrono::system_clock, std::chrono::milliseconds>(std::chrono::milliseconds(std::stoll(tokens[0])));
+            std::vector<int> detection_bounding_box = {
+                std::stoi(tokens[1]), // x
+                std::stoi(tokens[2]), // y
+                std::stoi(tokens[3]), // width
+                std::stoi(tokens[4])  // height
+            };
+            std::string detection_label = tokens[5];
+            std::string track_uuid = (tokens.size() == 7) ? tokens[6] : std::string("");
+            // Store the detection information
+            detection_timestamps.push_back(detection_timestamp);
+            detection_bounding_boxes.push_back(detection_bounding_box);
+            detection_labels.push_back(detection_label);
+            detection_track_uuids.push_back(track_uuid);
+        } else {
+            std::cerr << "Invalid detection line (expected 6 or 7 tokens): " << line << std::endl;
             continue;
         }
-        // Extract the detection information
-        Timestamp detection_timestamp = std::chrono::time_point<std::chrono::system_clock, std::chrono::milliseconds>(std::chrono::milliseconds(std::stoll(tokens[0])));
-        std::vector<int> detection_bounding_box = {
-            std::stoi(tokens[1]), // x
-            std::stoi(tokens[2]), // y
-            std::stoi(tokens[3]), // width
-            std::stoi(tokens[4])  // height
-        };
-        std::string detection_label = tokens[5];
-        // Store the detection information
-        detection_timestamps.push_back(detection_timestamp);
-        detection_bounding_boxes.push_back(detection_bounding_box);
-        detection_labels.push_back(detection_label);
     }
     // close the files
     video_timestamp_buffer_in.close();
@@ -358,6 +372,30 @@ void EventRecorder::_create_outputs_from_filebuffers() {
     if (frames.size() != frame_timestamps.size()) {
         std::cerr << "Warning: frames count (" << frames.size() << ") and timestamps count (" << frame_timestamps.size() << ") differ; using min = " << n << std::endl;
     }
+    // Prepare color map based on track UUIDs
+    std::unordered_map<std::string, cv::Scalar> uuid_color_map;
+    auto color_for_uuid = [&uuid_color_map](const std::string& uuid) -> cv::Scalar {
+        if (uuid.empty()) {
+            return cv::Scalar(0, 255, 0); // default green
+        }
+        auto it = uuid_color_map.find(uuid);
+        if (it != uuid_color_map.end()) {
+            return it->second;
+        }
+        // Hash uuid to hue 0-179
+        size_t h = std::hash<std::string>{}(uuid);
+        int hue = static_cast<int>(h % 180);
+        int sat = 200 + (h % 55); // 200-254
+        int val = 200 + ((h / 180) % 55);
+        cv::Mat hsv(1,1,CV_8UC3, cv::Scalar(hue, sat, val));
+        cv::Mat bgr;
+        cv::cvtColor(hsv, bgr, cv::COLOR_HSV2BGR);
+        cv::Vec3b bgr_pix = bgr.at<cv::Vec3b>(0,0);
+        cv::Scalar color(bgr_pix[0], bgr_pix[1], bgr_pix[2]);
+        uuid_color_map[uuid] = color;
+        return color;
+    };
+
     for (size_t i = 0; i < n; ++i) {
         // Get the current frame timestamp
         Timestamp frame_timestamp = frame_timestamps[i];
@@ -369,13 +407,20 @@ void EventRecorder::_create_outputs_from_filebuffers() {
                 // If the timestamps match, draw the detection bounding box and label
                 const auto& bbox = detection_bounding_boxes[j];
                 const auto& label = detection_labels[j];
+                std::string uuid = (j < detection_track_uuids.size()) ? detection_track_uuids[j] : std::string("");
                 // bbox = [x, y, width, height]
                 const int x = bbox[0];
                 const int y = bbox[1];
                 const int w = bbox[2];
                 const int h = bbox[3];
-                cv::rectangle(current_frame, cv::Rect(x, y, w, h), cv::Scalar(0, 255, 0), 2);
-                cv::putText(current_frame, label, cv::Point(x, std::max(0, y - 5)), cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(0, 255, 0), 2);
+                cv::Scalar color = color_for_uuid(uuid);
+                std::string display_label = label;
+                if (!uuid.empty()) {
+                    // append short uuid (first 8 chars) for disambiguation
+                    display_label += " [" + uuid.substr(0,8) + "]";
+                }
+                cv::rectangle(current_frame, cv::Rect(x, y, w, h), color, 2);
+                cv::putText(current_frame, display_label, cv::Point(x, std::max(0, y - 5)), cv::FONT_HERSHEY_SIMPLEX, 0.7, color, 2);
             }
         }
         // Write the frame with detections to the video writer

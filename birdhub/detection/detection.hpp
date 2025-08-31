@@ -122,6 +122,7 @@ struct ClassStatistics {
 // Track structure for object tracking
 struct Track {
     int track_id;
+    std::string track_uuid; // globally unique identifier for the track
     cv::Rect last_bbox;
     cv::Point2f last_center;
     std::map<std::string, ClassStatistics> class_votes;

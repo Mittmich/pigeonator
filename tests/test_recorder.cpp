@@ -855,3 +855,42 @@ TEST_CASE("EventRecorder writes correct number of frames to detections video (al
     CHECK(video_frames.size() == 5);
     cleanup_directory(temp_dir);
 }   
+
+TEST_CASE("EventRecorder writes detection buffer with optional track_uuid column") {
+    std::set<EventType> events = {EventType::DETECTION};
+    auto image_store = std::make_shared<ImageStore>(10);
+    std::string temp_dir = create_temp_directory();
+    EventRecorder recorder(events, image_store, temp_dir, 3, 30, 1);
+    auto event_queue = std::make_shared<std::queue<std::shared_ptr<Event>>>();
+    recorder.set_event_queue(event_queue);
+    recorder.start();
+    // Create a mock detection with a track uuid
+    Timestamp ts = test_now();
+    auto frame_event = std::make_shared<FrameEvent>(ts, std::nullopt);
+    std::vector<std::string> labels{"bird"};
+    std::vector<float> conf{0.9f};
+    std::vector<cv::Rect> boxes{cv::Rect(10,10,50,40)};
+    std::vector<int> areas{boxes[0].area()};
+    std::map<std::string,std::string> meta{{"type","test"}};
+    std::vector<std::string> tu{"12345678-1234-1234-1234-123456789abc"};
+    Detection det(ts, frame_event, labels, conf, boxes, areas, meta, tu);
+    DetectionEvent de(ts, {det});
+    auto de_ptr = std::make_shared<DetectionEvent>(de);
+    recorder.notify(de_ptr);
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    recorder.stop();
+    // Find detection buffer file
+    bool found = false;
+    for (const auto& entry : std::filesystem::directory_iterator(temp_dir)) {
+        if (entry.path().filename().string().find("detection_buffer_") != std::string::npos) {
+            std::ifstream in(entry.path());
+            std::string line; bool has_uuid = false; int line_count=0; 
+            while (std::getline(in,line)) { line_count++; if (std::count(line.begin(), line.end(), ',')==6) has_uuid=true; }
+            CHECK(line_count >= 1);
+            CHECK(has_uuid == true);
+            found = true; break;
+        }
+    }
+    CHECK(found == true);
+    cleanup_directory(temp_dir);
+}

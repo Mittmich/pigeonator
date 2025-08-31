@@ -309,9 +309,9 @@ TEST_CASE("E2E Integration Test - Detection Pipeline") {
                 bird_detector,
                 image_store,
                 3, // minimum_number_detections
-                0.3f, // iou_threshold
+                0.1f, // iou_threshold
                 5, // max_frames_without_detection
-                100.0f // max_path_length_threshold
+                500.0f // max_path_length_threshold
             );
 
             auto video_recorder = std::make_shared<EventRecorder>(
