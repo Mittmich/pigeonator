@@ -103,25 +103,28 @@ class SoundEffector(Effector):
         audio_driver = self._config.get("sdl_audio_driver", "alsa")
         audio_device = self._config.get("alsa_device", "plughw:2,0")
         self._alsa_card_id = str(self._config.get("alsa_card_id", "2"))
-        self._volume_controls = self._config.get("alsa_volume_controls", ["Master", "Channels"])
         self._sound_volume = int(self._config.get("sound_volume", 90))
+        # Map each ALSA control to its target volume percentage.
+        # Channels is always fixed at 100%; Master follows sound_volume.
+        self._volume_controls = self._config.get(
+            "alsa_volume_controls",
+            {"Master": self._sound_volume, "Channels": 100},
+        )
 
         os.environ["SDL_AUDIODRIVER"] = audio_driver
         os.environ["AUDIODEV"] = audio_device
 
         pygame.init()
-        pygame.mixer.init()
+        # channels=1 forces mono mixing so the same signal is sent to every
+        # physical speaker (important when only one speaker is connected).
+        pygame.mixer.init(channels=1)
         self._sound = pygame.mixer.Sound(self._config["sound_file"])
-        self._set_hardware_volume(self._sound_volume)
+        self._set_hardware_volume()
 
-    def _set_hardware_volume(self, percent: int) -> None:
-        """Set hardware mixer volume for all configured controls."""
-        if percent < 0:
-            percent = 0
-        if percent > 100:
-            percent = 100
-
-        for control in self._volume_controls:
+    def _set_hardware_volume(self) -> None:
+        """Set hardware mixer volume for each configured control."""
+        for control, percent in self._volume_controls.items():
+            percent = max(0, min(100, int(percent)))
             try:
                 subprocess.run(
                     ["amixer", "-c", self._alsa_card_id, "sset", str(control), f"{percent}%"],
@@ -144,7 +147,7 @@ class SoundEffector(Effector):
                 and self.is_activation_allowed()
             ):
                 activation_time = datetime.now()
-                self._set_hardware_volume(self._sound_volume)
+                self._set_hardware_volume()
                 self._sound.play()
                 end_time = datetime.now()
                 detection_time = detection.get("frame_timestamp", None)
