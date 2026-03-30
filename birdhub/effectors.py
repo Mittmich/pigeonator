@@ -3,6 +3,8 @@
 from abc import ABC, abstractmethod
 from typing import Optional, List, Dict
 from multiprocessing import Pipe
+import os
+import subprocess
 import pygame
 from threading import Thread
 from datetime import timedelta, datetime
@@ -97,8 +99,39 @@ class SoundEffector(Effector):
 
     def __init__(self,*args, **kwargs):
         super().__init__(*args, **kwargs)
+
+        audio_driver = self._config.get("sdl_audio_driver", "alsa")
+        audio_device = self._config.get("alsa_device", "plughw:2,0")
+        self._alsa_card_id = str(self._config.get("alsa_card_id", "2"))
+        self._volume_controls = self._config.get("alsa_volume_controls", ["Master", "Channels"])
+        self._sound_volume = int(self._config.get("sound_volume", 90))
+
+        os.environ["SDL_AUDIODRIVER"] = audio_driver
+        os.environ["AUDIODEV"] = audio_device
+
         pygame.init()
+        pygame.mixer.init()
         self._sound = pygame.mixer.Sound(self._config["sound_file"])
+        self._set_hardware_volume(self._sound_volume)
+
+    def _set_hardware_volume(self, percent: int) -> None:
+        """Set hardware mixer volume for all configured controls."""
+        if percent < 0:
+            percent = 0
+        if percent > 100:
+            percent = 100
+
+        for control in self._volume_controls:
+            try:
+                subprocess.run(
+                    ["amixer", "-c", self._alsa_card_id, "sset", str(control), f"{percent}%"],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    check=False,
+                )
+            except OSError:
+                # Keep running even if ALSA tools are unavailable on the current host.
+                continue
 
     def register_detection(self, data: Optional[List[Detection]]) -> None:
         """Register detection"""
@@ -111,6 +144,7 @@ class SoundEffector(Effector):
                 and self.is_activation_allowed()
             ):
                 activation_time = datetime.now()
+                self._set_hardware_volume(self._sound_volume)
                 self._sound.play()
                 end_time = datetime.now()
                 detection_time = detection.get("frame_timestamp", None)
