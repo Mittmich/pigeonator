@@ -24,16 +24,20 @@ def log_request_error(func):
             response.raise_for_status()
             return response
         except RequestException as e:
-            logger.error(f"Error sending data to remote server: {e}\nRequest body: {response.json()}")
+            try:
+                json_response = response.json()
+            except BaseException:
+                json_response = "No response body"
+            logger.error(f"Error sending data to remote server: {e}\nRequest body: {json_response}")
 
     return wrapper
 
 
 @log_request_error
-def send_detection(server_address: str, data: list[Detection], user: str = None, password: str = None, verify_ssl: bool = True):
+def send_detection(server_address: str, data: list[Detection], user: str = None, password: str = None, verify_ssl: bool = False):
     """Send detection data to the remote server."""
-    # get first detection to derive the timestamp
-    data = data[0]
+    # get last detection to derive the timestamp
+    data = data[-1]
     return requests.post(
         f"{server_address}/detections/",
         json={
@@ -51,14 +55,14 @@ def send_detection(server_address: str, data: list[Detection], user: str = None,
 
 
 @log_request_error
-def send_effect_activated(server_address: str, data: dict, user: str = None, password: str = None, verify_ssl: bool = True):
+def send_effect_activated(server_address: str, data: dict, user: str = None, password: str = None, verify_ssl: bool = False):
     """Send effect activated data to the remote server."""
     return requests.post(
         f"{server_address}/effectorAction/",
         json={
             "action": data["type"],
             "action_metadata": data["meta_information"],
-            "detection_timestamp": data["meta_information"]["detection_timestamp"].strftime("%Y-%m-%dT%H:%M:%S"),
+            "detection_timestamp": data["meta_information"]["detecton_timestamp"],
             "action_timestamp": data["timestamp"].strftime("%Y-%m-%dT%H:%M:%S"),
         },
         verify=verify_ssl,
@@ -67,7 +71,7 @@ def send_effect_activated(server_address: str, data: dict, user: str = None, pas
 
 
 @log_request_error
-def send_recording_stopped(server_address: str, data: dict, user: str = None, password: str = None, verify_ssl: bool = True):
+def send_recording_stopped(server_address: str, data: dict, user: str = None, password: str = None, verify_ssl: bool = False):
     """Send recording stopped data to the remote server."""
     # create smaller video using ffmpeg
     small_video_file = data["recording_file"] + "_small.mp4"
@@ -149,4 +153,4 @@ class EventDispatcher:
     def register_event(self, event: str, data: dict):
         """Register event and send to remote server if dispatcher listens to events."""
         if event in self._listening_for:
-            self.EVENT_HANDLERS[event](self._server_address, data)
+            self.EVENT_HANDLERS[event](self._server_address, data, self._user, self._password, self._verify_ssl)

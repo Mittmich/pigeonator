@@ -10,7 +10,9 @@ then
               --sound_path sounds/knocking_1.mp3 \
                 --minimum_number_detections 5 \
                 --motion_th_area 3_000 \
-                --bh_server http://192.168.0.150:8000 \
+                --bh_server https://192.168.0.150/api \
+                --bh_user USER \
+                --bh_password PASSWORD \
                 --stream_type raspi  "" "./recordings"
 fi
 

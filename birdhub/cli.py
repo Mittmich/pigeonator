@@ -89,7 +89,7 @@ def birds(url, outputdir, fps, slack, model):
 @click.command()
 @click.argument("url")
 @click.argument("outputdir")
-@click.option("--target_class", type=str, default="Pigeon")
+@click.option("--target_classes", type=str, default="Pigeon,Crow")
 @click.option("--fps", type=int, default=10)
 @click.option("--slack", type=int, default=100)
 @click.option("--model", type=str, default="weights/bh_v3.onnx")
@@ -102,11 +102,11 @@ def birds(url, outputdir, fps, slack, model):
 @click.option("--bh_server", type=str, default=None)
 @click.option('--bh_user', type=str, default=None)
 @click.option('--bh_password', type=str, default=None)
-@click.option('--bh_verify_ssl', type=bool, default=True)
+@click.option('--bh_verify_ssl', type=bool, default=False)
 def deter(
     url,
     outputdir,
-    target_class,
+    target_classes,
     fps,
     slack,
     model,
@@ -121,6 +121,11 @@ def deter(
     bh_password,
     bh_verify_ssl,
 ):
+    # parse target classes
+    if ',' in target_classes:
+        target_classes = target_classes.split(',')
+    else:
+        target_classes = [target_classes]
     if stream_type == 'rtsp':
         stream = RTSPStream(url)
     elif stream_type == 'raspi':
@@ -149,7 +154,7 @@ def deter(
     )
     # instantiate effector
     effector = EFFECTORS[effector](
-        target_class=target_class,
+        target_classes=target_classes,
         cooldown_time=timedelta(seconds=10),
         config={"sound_file": sound_path},
     )
