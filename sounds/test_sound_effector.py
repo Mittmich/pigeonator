@@ -36,9 +36,10 @@ effector = SoundEffector(
     config={
         "sound_file": SOUND_FILE,
         "sound_volume": 100,
-        # override these if your card differs from the default (card 2, plughw:2,0)
-        # "alsa_card_id":        "2",
-        # "alsa_device":         "plughw:2,0",
+        # optional overrides:
+        # "alsa_card_id":         "2",          # card used for amixer volume control
+        # "sdl_audio_driver":     "pulseaudio", # change to "alsa" if no PipeWire/PulseAudio
+        # "alsa_device":          "plughw:2,0", # only set when sdl_audio_driver="alsa"
         # "alsa_volume_controls": {"Master": 90, "Channels": 100},  # Channels always 100%
     },
 )

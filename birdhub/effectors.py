@@ -100,8 +100,10 @@ class SoundEffector(Effector):
     def __init__(self,*args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        audio_driver = self._config.get("sdl_audio_driver", "alsa")
-        audio_device = self._config.get("alsa_device", "plughw:2,0")
+        # Use PulseAudio driver by default so SDL routes through PipeWire's
+        # PulseAudio compatibility layer instead of opening the raw ALSA
+        # device directly (which PipeWire holds exclusively).
+        audio_driver = self._config.get("sdl_audio_driver", "pulseaudio")
         self._alsa_card_id = str(self._config.get("alsa_card_id", "2"))
         self._sound_volume = int(self._config.get("sound_volume", 90))
         # Map each ALSA control to its target volume percentage.
@@ -112,7 +114,10 @@ class SoundEffector(Effector):
         )
 
         os.environ["SDL_AUDIODRIVER"] = audio_driver
-        os.environ["AUDIODEV"] = audio_device
+        # AUDIODEV is only relevant for the alsa driver; skip it for pulseaudio.
+        audio_device = self._config.get("alsa_device", None)
+        if audio_device is not None:
+            os.environ["AUDIODEV"] = audio_device
 
         pygame.init()
         # channels=1 forces mono mixing so the same signal is sent to every
