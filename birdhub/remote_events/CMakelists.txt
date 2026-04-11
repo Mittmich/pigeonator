@@ -1,0 +1,17 @@
+add_library(RemoteEvents
+    remote_events.hpp remote_events.cpp
+)
+find_package(httplib REQUIRED)
+find_package(nlohmann_json REQUIRED)
+
+target_include_directories(RemoteEvents
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/../events
+)
+target_link_libraries(RemoteEvents
+    PUBLIC
+        Events
+        httplib::httplib
+        nlohmann_json::nlohmann_json
+)

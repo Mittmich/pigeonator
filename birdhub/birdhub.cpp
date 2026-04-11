@@ -5,6 +5,7 @@
 #include "recording/recorder.hpp"
 #include "effectors/mock_effector.hpp"
 #include "effectors/sound_effector.hpp"
+#include "remote_events/remote_events.hpp"
 #include <CLI/CLI.hpp>
 #include <iostream>
 #include <vector>
@@ -81,6 +82,7 @@ int main(int argc, char** argv) {
     int deter_motion_th_area = 2000;
     std::string deter_model, deter_effector, deter_sound_path;
     bool deter_record = true;
+    std::string deter_bh_server, deter_bh_user, deter_bh_password;
 
     auto* deter_cmd = app.add_subcommand("deter", "Full deterrence pipeline");
     deter_cmd->add_option("device", deter_device, "Camera device index or path")->required();
@@ -94,6 +96,9 @@ int main(int argc, char** argv) {
     deter_cmd->add_flag("--no-record{false}", deter_record, "Disable recording");
     deter_cmd->add_option("--minimum_detections", deter_min_detections, "Min detections for consensus")->default_val(5);
     deter_cmd->add_option("--motion_th_area", deter_motion_th_area, "Motion threshold area in pixels")->default_val(2000);
+    deter_cmd->add_option("--bh_server",   deter_bh_server,   "Remote birdhub server URL (e.g. http://host:8000)");
+    deter_cmd->add_option("--bh_user",     deter_bh_user,     "HTTP Basic Auth username");
+    deter_cmd->add_option("--bh_password", deter_bh_password, "HTTP Basic Auth password");
 
     CLI11_PARSE(app, argc, argv);
 
@@ -184,6 +189,13 @@ int main(int argc, char** argv) {
         auto manager = VideoEventManager(stream);
         manager.add_subscriber(combined);
         manager.add_subscriber(effector);
+
+        if (!deter_bh_server.empty()) {
+            auto dispatcher = std::make_shared<EventDispatcher>(
+                deter_bh_server, deter_bh_user, deter_bh_password
+            );
+            manager.add_subscriber(dispatcher);
+        }
 
         if (deter_record) {
             auto recorder = std::make_shared<EventRecorder>(

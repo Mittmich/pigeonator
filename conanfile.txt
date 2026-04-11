@@ -2,6 +2,8 @@
 doctest/2.4.11
 opencv/4.10.0
 cli11/2.3.0
+cpp-httplib/0.18.0
+nlohmann_json/3.11.3
 
 [generators]
 CMakeDeps
