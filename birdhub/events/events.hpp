@@ -28,7 +28,8 @@ inline Timestamp now() {
 enum class EventType {
     NEW_FRAME,
     DETECTION,
-    EFFECTOR_ACTION
+    EFFECTOR_ACTION,
+    RECORDING_STOPPED
 };
 
 // event class that holds metadata
@@ -132,6 +133,24 @@ public:
     std::string get_action() const;
 private:
     std::string action;
+};
+
+class RecordingStoppedEvent : public Event {
+public:
+    RecordingStoppedEvent(
+        Timestamp recording_start,
+        Timestamp recording_end,
+        std::string recording_file,
+        std::optional<std::map<std::string, std::string>> meta_data = std::nullopt);
+    ~RecordingStoppedEvent();
+    EventType type = EventType::RECORDING_STOPPED;
+    Timestamp get_recording_start() const;
+    Timestamp get_recording_end() const;
+    std::string get_recording_file() const;
+private:
+    Timestamp recording_start;
+    Timestamp recording_end;
+    std::string recording_file;
 };
 
 #endif

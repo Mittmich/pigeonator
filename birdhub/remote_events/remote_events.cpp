@@ -6,6 +6,9 @@
 #include <iomanip>
 #include <chrono>
 #include <ctime>
+#include <cstdlib>
+#include <filesystem>
+#include <fstream>
 
 using json = nlohmann::json;
 
@@ -59,7 +62,7 @@ EventDispatcher::~EventDispatcher() {
 }
 
 std::set<EventType> EventDispatcher::listening_to() {
-    return {EventType::DETECTION, EventType::EFFECTOR_ACTION};
+    return {EventType::DETECTION, EventType::EFFECTOR_ACTION, EventType::RECORDING_STOPPED};
 }
 
 void EventDispatcher::set_event_queue(std::shared_ptr<std::queue<std::shared_ptr<Event>>> eq) {
@@ -107,6 +110,9 @@ void EventDispatcher::dispatch(std::shared_ptr<Event> event) {
             break;
         case EventType::EFFECTOR_ACTION:
             send_effector_action(std::static_pointer_cast<EffectorActionEvent>(event));
+            break;
+        case EventType::RECORDING_STOPPED:
+            send_recording_stopped(std::static_pointer_cast<RecordingStoppedEvent>(event));
             break;
         default:
             break;
@@ -180,5 +186,46 @@ void EventDispatcher::send_effector_action(std::shared_ptr<EffectorActionEvent> 
             }
             return true;
         });
+    (void)ok;
+}
+
+void EventDispatcher::send_recording_stopped(std::shared_ptr<RecordingStoppedEvent> event) {
+    std::string original_file = event->get_recording_file();
+    std::string small_file    = original_file + "_small.mp4";
+
+    // Compress with ffmpeg (libx265, 640x320, CRF27)
+    std::string ffmpeg_cmd = "ffmpeg -y -i \"" + original_file + "\" -c:v libx265 -s 640x320 -crf 27 -c:a copy \"" + small_file + "\" 2>/dev/null";
+    int ret = std::system(ffmpeg_cmd.c_str());
+    if (ret != 0) {
+        std::cerr << "[EventDispatcher] ffmpeg compression failed for: " << original_file << "\n";
+        return;
+    }
+
+    std::ifstream f(small_file, std::ios::binary);
+    if (!f.is_open()) {
+        std::cerr << "[EventDispatcher] Could not open compressed file: " << small_file << "\n";
+        return;
+    }
+    std::string file_bytes((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+    f.close();
+
+    std::string filename = std::filesystem::path(original_file).filename().string();
+
+    httplib::MultipartFormDataItems items = {
+        {"recording_timestamp",     timestamp_to_iso8601(event->get_recording_start()), "", ""},
+        {"recording_end_timestamp", timestamp_to_iso8601(event->get_recording_end()),   "", ""},
+        {"file", file_bytes, filename, "video/mp4"},
+    };
+
+    bool ok = with_client(server_address, user, password, [&](httplib::Client& cli) {
+        auto res = cli.Post("/recordings/", items);
+        if (!res || res->status >= 400) {
+            std::cerr << "[EventDispatcher] POST /recordings/ failed: "
+                      << (res ? std::to_string(res->status) : "no response") << "\n";
+            return false;
+        }
+        return true;
+    });
+    std::filesystem::remove(small_file);
     (void)ok;
 }

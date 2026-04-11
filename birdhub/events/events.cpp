@@ -135,3 +135,19 @@ std::string EffectorActionEvent::get_action() const
     return action;
 }
 
+RecordingStoppedEvent::RecordingStoppedEvent(
+    Timestamp recording_start,
+    Timestamp recording_end,
+    std::string recording_file,
+    std::optional<std::map<std::string, std::string>> meta_data)
+    : Event(EventType::RECORDING_STOPPED, recording_end, meta_data),
+      recording_start(recording_start),
+      recording_end(recording_end),
+      recording_file(std::move(recording_file)) {}
+
+RecordingStoppedEvent::~RecordingStoppedEvent() = default;
+
+Timestamp RecordingStoppedEvent::get_recording_start() const { return recording_start; }
+Timestamp RecordingStoppedEvent::get_recording_end()   const { return recording_end; }
+std::string RecordingStoppedEvent::get_recording_file() const { return recording_file; }
+

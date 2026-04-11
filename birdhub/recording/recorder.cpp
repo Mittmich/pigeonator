@@ -362,7 +362,9 @@ void EventRecorder::_create_outputs_from_filebuffers() {
     // effector events currently unused in rendering
     // create new writer
     cv::VideoWriter detection_writer;
-    detection_writer.open((std::filesystem::path(output_directory) / ("detections_" + std::to_string(std::time(nullptr)) + ".mp4")).string(),
+    std::string detection_output_filename = "detections_" + std::to_string(std::time(nullptr)) + ".mp4";
+    detection_output_path = std::filesystem::path(output_directory) / detection_output_filename;
+    detection_writer.open(detection_output_path.string(),
                           cv::VideoWriter::fourcc('m', 'p', '4', 'v'), this->fps, this->frame_size, true);
     if (!detection_writer.isOpened()) {
         throw std::runtime_error("Could not open detection video writer.");
@@ -428,6 +430,16 @@ void EventRecorder::_create_outputs_from_filebuffers() {
     }
     // close the video writer
     detection_writer.release();
+
+    // Emit RECORDING_STOPPED event so subscribers (e.g. EventDispatcher) can upload the file
+    if (event_queue && std::filesystem::exists(detection_output_path)) {
+        Timestamp recording_end = now();
+        event_queue->push(std::make_shared<RecordingStoppedEvent>(
+            recording_start_system,
+            recording_end,
+            detection_output_path.string()
+        ));
+    }
 }
 
 void EventRecorder::_create_filebuffers() {
@@ -497,6 +509,7 @@ void EventRecorder::handle_detection(std::shared_ptr<DetectionEvent> detection_e
         // Start recording if not already recording
         this->_stop_recording_in = this->slack;
         this->recording_start_time = std::chrono::steady_clock::now();
+        this->recording_start_system = now();
         this->_create_filebuffers();
         // Write everything in the video buffer to the file
         for (const auto& frame_event : video_buffer) {

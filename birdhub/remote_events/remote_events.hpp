@@ -44,6 +44,7 @@ private:
     void dispatch(std::shared_ptr<Event> event);
     void send_detection(std::shared_ptr<DetectionEvent> event);
     void send_effector_action(std::shared_ptr<EffectorActionEvent> event);
+    void send_recording_stopped(std::shared_ptr<RecordingStoppedEvent> event);
 
     std::string server_address;
     std::string user;

@@ -115,8 +115,10 @@ protected:
     std::ofstream effector_buffer_file;
     // Buffer for video frames
     std::deque<std::shared_ptr<FrameEvent>> video_buffer;
-    // recording start time
+    // recording start/end times
     std::chrono::time_point<std::chrono::steady_clock> recording_start_time;
+    Timestamp recording_start_system; // system-clock timestamp when recording began
+    std::filesystem::path detection_output_path; // path of the annotated output video
 };
 
 

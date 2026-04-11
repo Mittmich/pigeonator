@@ -28,12 +28,13 @@ static std::shared_ptr<EffectorActionEvent> make_effector_event(const std::strin
     return std::make_shared<EffectorActionEvent>(test_now(), action, meta);
 }
 
-TEST_CASE("EventDispatcher: listens to DETECTION and EFFECTOR_ACTION") {
+TEST_CASE("EventDispatcher: listens to DETECTION, EFFECTOR_ACTION, and RECORDING_STOPPED") {
     EventDispatcher dispatcher("http://localhost:1");
     auto listening = dispatcher.listening_to();
-    CHECK(listening.count(EventType::DETECTION)      == 1);
-    CHECK(listening.count(EventType::EFFECTOR_ACTION) == 1);
-    CHECK(listening.size() == 2);
+    CHECK(listening.count(EventType::DETECTION)        == 1);
+    CHECK(listening.count(EventType::EFFECTOR_ACTION)  == 1);
+    CHECK(listening.count(EventType::RECORDING_STOPPED) == 1);
+    CHECK(listening.size() == 3);
 }
 
 TEST_CASE("EventDispatcher: start and stop without requests") {
