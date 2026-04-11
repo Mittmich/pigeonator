@@ -360,7 +360,22 @@ void EventRecorder::_create_outputs_from_filebuffers() {
     // close the files
     video_timestamp_buffer_in.close();
     detection_buffer_in.close();
-    // effector events currently unused in rendering
+
+    // load effector activations from buffer file: format is "timestamp_ms,type"
+    std::vector<Timestamp>   activation_timestamps;
+    std::vector<std::string> activation_types;
+    std::ifstream effector_buffer_in(effector_event_full_path.string());
+    while (effector_buffer_in.is_open() && std::getline(effector_buffer_in, line)) {
+        std::istringstream iss(line);
+        std::string tok_ts, tok_type;
+        if (std::getline(iss, tok_ts, ',') && std::getline(iss, tok_type)) {
+            Timestamp act_ts = std::chrono::time_point<std::chrono::system_clock, std::chrono::milliseconds>(
+                std::chrono::milliseconds(std::stoll(tok_ts)));
+            activation_timestamps.push_back(act_ts);
+            activation_types.push_back(tok_type);
+        }
+    }
+
     // create new writer
     cv::VideoWriter detection_writer;
     std::string detection_output_filename = "detections_" + std::to_string(std::time(nullptr)) + ".mp4";
@@ -427,6 +442,25 @@ void EventRecorder::_create_outputs_from_filebuffers() {
             }
         }
         // Write the frame with detections to the video writer
+        // Overlay activation text for any effector triggered within 2 seconds before this frame
+        for (size_t k = 0; k < activation_timestamps.size(); ++k) {
+            auto diff = frame_timestamp - activation_timestamps[k];
+            if (diff >= std::chrono::milliseconds(0) &&
+                diff < std::chrono::milliseconds(2000)) {
+                const std::string& act_text = activation_types[k];
+                int font     = cv::FONT_HERSHEY_DUPLEX;
+                double scale = 7.0;
+                int thick    = 2;
+                int baseline = 0;
+                cv::Size text_size = cv::getTextSize(act_text, font, scale, thick, &baseline);
+                int text_x = (current_frame.cols - text_size.width) / 2;
+                int text_y = (current_frame.rows + text_size.height) / 2;
+                cv::putText(current_frame, act_text,
+                            cv::Point(text_x, text_y),
+                            font, scale, cv::Scalar(0, 0, 255), thick);
+                break; // only one overlay at a time
+            }
+        }
         detection_writer.write(current_frame);
     }
     // close the video writer
