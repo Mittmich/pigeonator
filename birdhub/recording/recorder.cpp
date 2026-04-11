@@ -1,4 +1,5 @@
 #include "recorder.hpp"
+#include "logger.hpp"
 #include <string>
 #include <optional>
 #include <iostream>
@@ -488,6 +489,7 @@ void EventRecorder::handle_new_frame(std::shared_ptr<FrameEvent> frame_event) {
         // If countdown just reached zero, finalize outputs immediately
         if (this->_stop_recording_in <= 0 && this->videobuffer_writer.isOpened()) {
             std::cout << "Stopping recording."  << std::endl;
+            log_event("INFO", "recording_stopped", "event recording stopped");
             this->_create_outputs_from_filebuffers();
             this->_clear_buffers();
             this->recording = false;
@@ -495,6 +497,7 @@ void EventRecorder::handle_new_frame(std::shared_ptr<FrameEvent> frame_event) {
     } else if (this->videobuffer_writer.isOpened()) {
         // Log the end of recording
         std::cout << "Stopping recording."  << std::endl;
+        log_event("INFO", "recording_stopped", "event recording stopped");
         this->_create_outputs_from_filebuffers();
         this->_clear_buffers();
         this->recording = false;
@@ -520,6 +523,7 @@ void EventRecorder::handle_detection(std::shared_ptr<DetectionEvent> detection_e
         // clear video buffer
         video_buffer.clear();
         // log the start of recording
+        log_event("INFO", "recording_started", "event recording started");
         std::cout << "Starting recording." << std::endl;
         this->recording = true;
     }

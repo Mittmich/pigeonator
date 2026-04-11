@@ -1,4 +1,6 @@
 add_library(Orchestration orchestration.hpp orchestration.cpp)
+target_include_directories(Orchestration PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../logging)
+target_link_libraries(Orchestration PUBLIC Logger)
 target_include_directories(Orchestration
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/../video

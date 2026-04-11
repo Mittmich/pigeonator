@@ -1,5 +1,7 @@
 add_library(Video video.hpp video.cpp)
 target_include_directories(Video PUBLIC ${OpenCV_INCLUDE_DIRS})
+target_include_directories(Video PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../logging)
+target_link_libraries(Video PUBLIC Logger)
 
 target_include_directories(Video
     PUBLIC

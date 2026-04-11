@@ -3,6 +3,7 @@
 */
 
 #include "video.hpp"
+#include "logger.hpp"
 
 #ifdef __linux__
 V4l2CameraCapture::V4l2CameraCapture(const char* device, int width, int height, uint32_t pixel_format, bool non_blocking = false)
@@ -220,6 +221,7 @@ void Stream::register_frame_queue(std::shared_ptr<std::queue<std::shared_ptr<Fra
 void Stream::start() {
     // start camera capture
     cam_capture->startStreaming();
+    log_event("INFO", "stream_started", "");
     // check if frame queue is registered
     if (!this->queue_registered) {
         throw std::runtime_error("Frame queue not registered.");

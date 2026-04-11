@@ -1,5 +1,7 @@
 add_library(Recorder recorder.hpp recorder.cpp)
 target_include_directories(Recorder PUBLIC ${OpenCV_INCLUDE_DIRS})
+target_include_directories(Recorder PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../logging)
+target_link_libraries(Recorder PUBLIC Logger)
 target_include_directories(Recorder
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/../video

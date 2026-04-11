@@ -1,4 +1,5 @@
 #include "orchestration.hpp"
+#include "logger.hpp"
 #include <iostream>
 #include <signal.h>
 #include <atomic>
@@ -50,6 +51,31 @@ void VideoEventManager::run() {
         }
         // get the event from the queue
         auto event = this->event_queue->front();
+
+        // structured logging (mirrors Python orchestration)
+        if (event->type == EventType::DETECTION) {
+            auto det = std::static_pointer_cast<DetectionEvent>(event);
+            auto detections = det->get_detections();
+            if (!detections.empty()) {
+                auto& last = detections.back();
+                std::string info;
+                if (last.get_labels() && !last.get_labels().value().empty()) {
+                    info += "class=" + last.get_labels().value().front();
+                }
+                if (last.get_confidences() && !last.get_confidences().value().empty()) {
+                    info += " confidence=" + std::to_string(last.get_confidences().value().front());
+                }
+                log_event("INFO", "detection", info);
+            }
+        } else if (event->type == EventType::EFFECTOR_ACTION) {
+            auto eff = std::static_pointer_cast<EffectorActionEvent>(event);
+            std::string info = "action=" + eff->get_action();
+            for (const auto& [k, v] : eff->get_meta_data()) {
+                info += " " + k + "=" + v;
+            }
+            log_event("INFO", "effect_activated", info);
+        }
+
         // notify all subscribers
         for (auto &subscriber : this->subscribers) {
             // check if subscriber is listening to the event type

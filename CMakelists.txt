@@ -18,6 +18,7 @@ find_package(nlohmann_json REQUIRED)
 
 # add shared libraries
 
+add_subdirectory(birdhub/logging)
 add_subdirectory(birdhub/video)
 add_subdirectory(birdhub/events)
 add_subdirectory(birdhub/orchestration)
@@ -43,6 +44,7 @@ target_include_directories(pgn PRIVATE
         "${PROJECT_SOURCE_DIR}/birdhub/memory_management"
         "${PROJECT_SOURCE_DIR}/birdhub/effectors"
         "${PROJECT_SOURCE_DIR}/birdhub/remote_events"
+        "${PROJECT_SOURCE_DIR}/birdhub/logging"
         ${OpenCV_INCLUDE_DIRS} )
 target_include_directories(run_onnx_on_video PRIVATE 
         "${PROJECT_BINARY_DIR}"
@@ -52,7 +54,7 @@ target_include_directories(run_onnx_on_video PRIVATE
         "${PROJECT_SOURCE_DIR}/birdhub/detection"
         "${PROJECT_SOURCE_DIR}/birdhub/recording"
         "${PROJECT_SOURCE_DIR}/birdhub/memory_management"        ${OpenCV_INCLUDE_DIRS} )
-target_link_libraries(pgn PRIVATE ${LIBCAMERA_LIBRARIES} opencv::opencv CLI11::CLI11 Video Events Orchestration Detection Recorder MemoryManagement Effectors RemoteEvents)
+target_link_libraries(pgn PRIVATE ${LIBCAMERA_LIBRARIES} opencv::opencv CLI11::CLI11 Video Events Orchestration Detection Recorder MemoryManagement Effectors RemoteEvents Logger)
 target_link_libraries(example PRIVATE ${LIBCAMERA_LIBRARIES} opencv::opencv Video Events Orchestration Detection Recorder MemoryManagement)
 target_link_libraries(run_onnx_on_video PRIVATE ${LIBCAMERA_LIBRARIES} opencv::opencv Video Events Orchestration Detection Recorder MemoryManagement)
 # tests
