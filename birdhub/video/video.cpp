@@ -166,13 +166,20 @@ void V4l2CameraCapture::cleanup() {
 // Cross-platform OpenCV-based camera capture implementation
 OpenCVCameraCapture::OpenCVCameraCapture(int camera_id) : camera_id_(camera_id) {}
 
+OpenCVCameraCapture::OpenCVCameraCapture(const std::string& url)
+    : url_(url), use_url_(true) {}
+
 OpenCVCameraCapture::~OpenCVCameraCapture() {
     stopStreaming();
 }
 
 void OpenCVCameraCapture::startStreaming() {
     if (!cap.isOpened()) {
-        cap.open(camera_id_);
+        if (use_url_) {
+            cap.open(url_, cv::CAP_FFMPEG);
+        } else {
+            cap.open(camera_id_);
+        }
         if (!cap.isOpened()) {
             throw std::runtime_error("Failed to open camera");
         }

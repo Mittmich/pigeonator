@@ -121,3 +121,17 @@ std::optional<std::vector<std::string>> Detection::get_track_uuids() const {
     return track_uuids;
 }
 
+EffectorActionEvent::EffectorActionEvent(
+    Timestamp event_timestamp,
+    std::string action,
+    std::optional<std::map<std::string, std::string>> meta_data)
+    : Event(EventType::EFFECTOR_ACTION, event_timestamp, meta_data),
+      action(std::move(action)) {}
+
+EffectorActionEvent::~EffectorActionEvent() = default;
+
+std::string EffectorActionEvent::get_action() const
+{
+    return action;
+}
+

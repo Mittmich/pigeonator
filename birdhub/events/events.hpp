@@ -121,4 +121,17 @@ private:
     std::vector<Detection> detections;
 };
 
+class EffectorActionEvent : public Event {
+public:
+    EffectorActionEvent(
+        Timestamp event_timestamp,
+        std::string action,
+        std::optional<std::map<std::string, std::string>> meta_data = std::nullopt);
+    ~EffectorActionEvent();
+    EventType type = EventType::EFFECTOR_ACTION;
+    std::string get_action() const;
+private:
+    std::string action;
+};
+
 #endif

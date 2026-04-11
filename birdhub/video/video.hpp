@@ -64,6 +64,7 @@ private:
 class OpenCVCameraCapture : public CameraCapture {
 public:
     OpenCVCameraCapture(int camera_id = 0);
+    OpenCVCameraCapture(const std::string& url);
     ~OpenCVCameraCapture();
     void startStreaming() override;
     void stopStreaming() override;
@@ -71,7 +72,9 @@ public:
 
 private:
     cv::VideoCapture cap;
-    int camera_id_;
+    int camera_id_ = -1;
+    std::string url_;
+    bool use_url_ = false;
     bool started = false;
 };
 
