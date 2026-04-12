@@ -137,3 +137,54 @@ TEST_CASE("Performance - full detection pipeline throughput") {
             << " (" << det_count << " detections in " << duration_seconds << "s)");
     CHECK(frame_fps > 0.0);
 }
+
+TEST_CASE("Performance - bird detector only throughput") {
+    std::string video_path = "tests/test_videos/video_with_single_sitting_bird.mp4";
+    auto image_store = std::make_shared<ImageStore>(800);
+
+    // Load video frames into memory first to isolate detector performance
+    cv::VideoCapture cap(video_path);
+    REQUIRE(cap.isOpened());
+
+    std::vector<std::shared_ptr<FrameEvent>> frames;
+    cv::Mat raw;
+    while (cap.read(raw) && !raw.empty()) {
+        auto ts = now();
+        auto frame_event = std::make_shared<FrameEvent>(ts, std::nullopt);
+        image_store->put(ts, raw);
+        frames.push_back(frame_event);
+    }
+    cap.release();
+    REQUIRE(frames.size() > 0);
+
+    // Create detector (not wired into event pipeline)
+    BirdDetectorYolov5 detector(
+        image_store, "weights/bh_v3.onnx", cv::Size(640, 640),
+        0.25f, 0.45f, std::chrono::seconds(500), 1);
+
+    // Run inference on every frame in a tight loop, cycling through frames
+    int total_inferences = 0;
+    int total_detections = 0;
+    auto start = std::chrono::steady_clock::now();
+    constexpr int duration_seconds = 10;
+    auto deadline = start + std::chrono::seconds(duration_seconds);
+
+    while (std::chrono::steady_clock::now() < deadline) {
+        for (size_t i = 0; i < frames.size(); ++i) {
+            if (std::chrono::steady_clock::now() >= deadline) break;
+            auto result = detector.detect(frames[i]);
+            total_inferences++;
+            if (result.has_value()) total_detections++;
+        }
+    }
+
+    auto elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+    double inference_fps = total_inferences / elapsed;
+    double det_per_sec = total_detections / elapsed;
+
+    MESSAGE("Bird Detector inference FPS: " << inference_fps
+            << " | Detection events/s: " << det_per_sec
+            << " (" << total_inferences << " inferences, "
+            << total_detections << " detections in " << elapsed << "s)");
+    CHECK(inference_fps > 0.0);
+}
