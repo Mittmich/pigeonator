@@ -28,13 +28,12 @@ static std::shared_ptr<EffectorActionEvent> make_effector_event(const std::strin
     return std::make_shared<EffectorActionEvent>(test_now(), action, meta);
 }
 
-TEST_CASE("EventDispatcher: listens to DETECTION, EFFECTOR_ACTION, and RECORDING_STOPPED") {
+TEST_CASE("EventDispatcher: listens to DETECTION and RECORDING_STOPPED") {
     EventDispatcher dispatcher("http://localhost:1");
     auto listening = dispatcher.listening_to();
-    CHECK(listening.count(EventType::DETECTION)        == 1);
-    CHECK(listening.count(EventType::EFFECTOR_ACTION)  == 1);
+    CHECK(listening.count(EventType::DETECTION)         == 1);
     CHECK(listening.count(EventType::RECORDING_STOPPED) == 1);
-    CHECK(listening.size() == 3);
+    CHECK(listening.size() == 2);
 }
 
 TEST_CASE("EventDispatcher: start and stop without requests") {
@@ -50,11 +49,9 @@ TEST_CASE("EventDispatcher: notify enqueues events without blocking") {
     dispatcher.start();
 
     auto det_event = make_detection_with_meta("Pigeon", 0.9f);
-    auto eff_event = make_effector_event("effect_activated");
 
     // notify() must return immediately (event is queued, not sent inline)
     dispatcher.notify(det_event);
-    dispatcher.notify(eff_event);
 
     dispatcher.stop();
 }

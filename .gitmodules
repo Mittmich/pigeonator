@@ -1,3 +1,6 @@
 [submodule "yolov5"]
 	path = yolov5
 	url = https://github.com/ultralytics/yolov5
+[submodule "birdhub-server"]
+	path = birdhub-server
+	url = https://github.com/Mittmich/birdhub-server.git

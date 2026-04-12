@@ -12,14 +12,14 @@
 #include <atomic>
 
 /**
- * EventDispatcher - sends detection and effector events to a remote HTTP server.
+ * EventDispatcher - sends detection and recording events to a remote HTTP server.
  *
  * Implements Subscriber so it can be wired directly into VideoEventManager.
  * All HTTP calls happen in a dedicated background thread (non-blocking for callers).
  *
- * Endpoints mirrored from the Python version:
- *   POST {server}/detections/       — on DETECTION
- *   POST {server}/effectorAction/   — on EFFECTOR_ACTION
+ * Endpoints:
+ *   POST {server}/detections/   — on DETECTION
+ *   POST {server}/recordings/   — on RECORDING_STOPPED
  *
  * Optional HTTP Basic Auth and SSL verification control.
  */
@@ -43,7 +43,6 @@ private:
     void worker_loop();
     void dispatch(std::shared_ptr<Event> event);
     void send_detection(std::shared_ptr<DetectionEvent> event);
-    void send_effector_action(std::shared_ptr<EffectorActionEvent> event);
     void send_recording_stopped(std::shared_ptr<RecordingStoppedEvent> event);
 
     std::string server_address;

@@ -62,7 +62,7 @@ EventDispatcher::~EventDispatcher() {
 }
 
 std::set<EventType> EventDispatcher::listening_to() {
-    return {EventType::DETECTION, EventType::EFFECTOR_ACTION, EventType::RECORDING_STOPPED};
+    return {EventType::DETECTION, EventType::RECORDING_STOPPED};
 }
 
 void EventDispatcher::set_event_queue(std::shared_ptr<std::queue<std::shared_ptr<Event>>> eq) {
@@ -108,9 +108,6 @@ void EventDispatcher::dispatch(std::shared_ptr<Event> event) {
         case EventType::DETECTION:
             send_detection(std::static_pointer_cast<DetectionEvent>(event));
             break;
-        case EventType::EFFECTOR_ACTION:
-            send_effector_action(std::static_pointer_cast<EffectorActionEvent>(event));
-            break;
         case EventType::RECORDING_STOPPED:
             send_recording_stopped(std::static_pointer_cast<RecordingStoppedEvent>(event));
             break;
@@ -153,34 +150,6 @@ void EventDispatcher::send_detection(std::shared_ptr<DetectionEvent> event) {
             auto res = cli.Post(path, body.dump(), "application/json");
             if (!res || res->status >= 400) {
                 std::cerr << "[EventDispatcher] POST /detections/ failed: "
-                          << (res ? std::to_string(res->status) : "no response") << "\n";
-                return false;
-            }
-            return true;
-        });
-    (void)ok;
-}
-
-void EventDispatcher::send_effector_action(std::shared_ptr<EffectorActionEvent> event) {
-    auto meta = event->get_meta_data(); // returns std::map<string,string> (not optional)
-
-    json metadata_json = json::object();
-    for (const auto& [k, v] : meta) {
-        metadata_json[k] = v;
-    }
-
-    json body = {
-        {"action",              event->get_action()},
-        {"action_metadata",     metadata_json},
-        {"action_timestamp",    timestamp_to_iso8601(event->get_timestamp())},
-    };
-
-    std::string path = "/effectorAction/";
-    bool ok = with_client(server_address, user, password,
-        [&](httplib::Client& cli) {
-            auto res = cli.Post(path, body.dump(), "application/json");
-            if (!res || res->status >= 400) {
-                std::cerr << "[EventDispatcher] POST /effectorAction/ failed: "
                           << (res ? std::to_string(res->status) : "no response") << "\n";
                 return false;
             }

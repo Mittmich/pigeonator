@@ -1,8 +1,11 @@
 #include "test_utils.hpp"
+#include "test_server_fixtures.hpp"
 #include "detection.hpp"
 #include "orchestration.hpp"
 #include "recorder.hpp"
 #include "video.hpp"
+#include "mock_effector.hpp"
+#include "remote_events.hpp"
 #include "timestamp_utils.hpp"
 #include <doctest/doctest.h>
 #include <opencv2/opencv.hpp>
@@ -11,6 +14,9 @@
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <sstream>
+#include <iomanip>
+#include <ctime>
 
 // Video file capture implementation for testing
 class VideoFileCapture : public CameraCapture {
@@ -445,6 +451,206 @@ TEST_CASE("E2E Integration Test - Detection Pipeline") {
         } catch (const std::exception& e) {
             FAIL("Failed to process user video: " << e.what());
         }
+    }
+
+    SUBCASE("Effector activation emits EFFECTOR_ACTION event") {
+        std::string user_video_path = "tests/test_videos/video_with_single_sitting_bird.mp4";
+        auto image_store = std::make_shared<ImageStore>(800);
+
+        try {
+            auto video_capture = std::make_unique<VideoFileCapture>(user_video_path);
+            auto video_stream = std::make_shared<Stream>(image_store, video_capture.get());
+
+            auto motion_detector = std::make_shared<MotionDetector>(
+                image_store, 24, 21, 5, 100, 0, std::chrono::seconds(100));
+
+            auto bird_detector = std::make_shared<BirdDetectorYolov5>(
+                image_store, "weights/bh_v3.onnx", cv::Size(640, 640),
+                0.25f, 0.45f, std::chrono::seconds(500), 50);
+
+            auto motion_activated_detector = std::make_shared<MotionActivatedDetector>(
+                motion_detector, bird_detector, image_store, 3, 5);
+
+            auto mock_effector = std::make_shared<MockEffector>(
+                std::vector<std::string>{"Pigeon"}, std::chrono::seconds(0));
+
+            auto mock_subscriber = std::make_shared<MockSubscriber>();
+
+            VideoEventManager event_manager(*video_stream);
+            event_manager.add_subscriber(motion_activated_detector);
+            event_manager.add_subscriber(mock_effector);
+            event_manager.add_subscriber(mock_subscriber);
+
+            std::thread pipeline_thread([&event_manager]() {
+                event_manager.run();
+            });
+
+            std::this_thread::sleep_for(std::chrono::seconds(5));
+            event_manager.stop();
+            if (pipeline_thread.joinable()) pipeline_thread.join();
+
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+
+            print_event_summary(*mock_subscriber);
+            CHECK(get_event_count_by_type(*mock_subscriber, EventType::DETECTION) > 0);
+            CHECK(get_event_count_by_type(*mock_subscriber, EventType::EFFECTOR_ACTION) > 0);
+
+            // Verify at least one effector action has the expected action string
+            bool found_activation = false;
+            for (const auto& event : mock_subscriber->received_events) {
+                if (event->type == EventType::EFFECTOR_ACTION) {
+                    auto ea = std::static_pointer_cast<EffectorActionEvent>(event);
+                    if (ea->get_action() == "effect_activated") {
+                        found_activation = true;
+                        break;
+                    }
+                }
+            }
+            CHECK(found_activation);
+            INFO("Effector activation test passed");
+
+        } catch (const std::exception& e) {
+            FAIL("Effector activation test failed: " << e.what());
+        }
+    }
+
+    SUBCASE("Detection persisted to server") {
+        ServerFixture server;
+        BirdhubApiClient client(server.url());
+
+        std::string user_video_path = "tests/test_videos/video_with_single_sitting_bird.mp4";
+        auto image_store = std::make_shared<ImageStore>(800);
+
+        try {
+            auto video_capture = std::make_unique<VideoFileCapture>(user_video_path);
+            auto video_stream = std::make_shared<Stream>(image_store, video_capture.get());
+
+            auto motion_detector = std::make_shared<MotionDetector>(
+                image_store, 24, 21, 5, 100, 0, std::chrono::seconds(100));
+
+            auto bird_detector = std::make_shared<BirdDetectorYolov5>(
+                image_store, "weights/bh_v3.onnx", cv::Size(640, 640),
+                0.25f, 0.45f, std::chrono::seconds(500), 50);
+
+            auto motion_activated_detector = std::make_shared<MotionActivatedDetector>(
+                motion_detector, bird_detector, image_store, 3, 5);
+
+            auto mock_effector = std::make_shared<MockEffector>(
+                std::vector<std::string>{"Pigeon"}, std::chrono::seconds(0));
+
+            auto event_dispatcher = std::make_shared<EventDispatcher>(server.url());
+
+            auto mock_subscriber = std::make_shared<MockSubscriber>();
+
+            VideoEventManager event_manager(*video_stream);
+            event_manager.add_subscriber(motion_activated_detector);
+            event_manager.add_subscriber(mock_effector);
+            event_manager.add_subscriber(event_dispatcher);
+            event_manager.add_subscriber(mock_subscriber);
+
+            std::thread pipeline_thread([&event_manager]() {
+                event_manager.run();
+            });
+
+            std::this_thread::sleep_for(std::chrono::seconds(5));
+            event_manager.stop();
+            if (pipeline_thread.joinable()) pipeline_thread.join();
+
+            // Give dispatcher time to flush pending HTTP requests
+            std::this_thread::sleep_for(std::chrono::seconds(2));
+
+            int det_count = client.count_detections();
+            MESSAGE("Server detections: " << det_count);
+            CHECK(det_count > 0);
+
+        } catch (const std::exception& e) {
+            FAIL("Server detection persistence test failed: " << e.what());
+        }
+    }
+
+    SUBCASE("Recording uploaded to server after detection") {
+        // Skip if ffmpeg is not available
+        if (std::system("which ffmpeg > /dev/null 2>&1") != 0) {
+            MESSAGE("Skipping: ffmpeg not found");
+            return;
+        }
+
+        ServerFixture server;
+        BirdhubApiClient client(server.url());
+
+        std::string user_video_path = "tests/test_videos/video_with_single_sitting_bird.mp4";
+        auto image_store = std::make_shared<ImageStore>(800);
+        std::string recording_dir = "/tmp/bh_e2e_recordings_" + std::to_string(getpid());
+        std::filesystem::create_directories(recording_dir);
+
+        try {
+            auto video_capture = std::make_unique<VideoFileCapture>(user_video_path);
+            auto video_stream = std::make_shared<Stream>(image_store, video_capture.get());
+
+            auto motion_detector = std::make_shared<MotionDetector>(
+                image_store, 24, 21, 5, 100, 0, std::chrono::seconds(100));
+
+            auto bird_detector = std::make_shared<BirdDetectorYolov5>(
+                image_store, "weights/bh_v3.onnx", cv::Size(640, 640),
+                0.25f, 0.45f, std::chrono::seconds(500), 50);
+
+            auto motion_activated_detector = std::make_shared<MotionActivatedDetector>(
+                motion_detector, bird_detector, image_store, 3, 5);
+
+            auto mock_effector = std::make_shared<MockEffector>(
+                std::vector<std::string>{"Pigeon"}, std::chrono::seconds(0));
+
+            auto video_recorder = std::make_shared<EventRecorder>(
+                std::set<EventType>({EventType::NEW_FRAME, EventType::DETECTION}),
+                image_store,
+                recording_dir,
+                50,  // slack — short for faster recording stop
+                10,
+                300);
+
+            auto event_dispatcher = std::make_shared<EventDispatcher>(server.url());
+
+            auto mock_subscriber = std::make_shared<MockSubscriber>();
+
+            VideoEventManager event_manager(*video_stream);
+            event_manager.add_subscriber(motion_activated_detector);
+            event_manager.add_subscriber(mock_effector);
+            event_manager.add_subscriber(video_recorder);
+            event_manager.add_subscriber(event_dispatcher);
+            event_manager.add_subscriber(mock_subscriber);
+
+            std::thread pipeline_thread([&event_manager]() {
+                event_manager.run();
+            });
+
+            std::this_thread::sleep_for(std::chrono::seconds(5));
+            event_manager.stop();
+            if (pipeline_thread.joinable()) pipeline_thread.join();
+
+            // Wait for ffmpeg compression and upload
+            std::this_thread::sleep_for(std::chrono::seconds(8));
+
+            int rec_count = client.count_recordings();
+            MESSAGE("Server recordings: " << rec_count);
+            CHECK(rec_count > 0);
+
+            // Verify upload dir has at least one .mp4 file
+            bool found_mp4 = false;
+            for (const auto& entry : std::filesystem::directory_iterator(server.uploads_dir())) {
+                if (entry.path().extension() == ".mp4") {
+                    found_mp4 = true;
+                    break;
+                }
+            }
+            CHECK(found_mp4);
+
+        } catch (const std::exception& e) {
+            FAIL("Recording upload test failed: " << e.what());
+        }
+
+        // Clean up recording dir
+        std::error_code ec;
+        std::filesystem::remove_all(recording_dir, ec);
     }
 
 

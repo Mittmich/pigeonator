@@ -31,8 +31,26 @@ target_link_libraries(all_tests PRIVATE doctest::doctest ${OpenCV_LIBS})
 target_link_libraries(all_tests PUBLIC Events Video Detection Orchestration Recorder MemoryManagement test_utils Effectors RemoteEvents)
 
 # add executable for e2e test files
-add_executable(e2e_tests main.cpp test_e2e_integration.cpp)
+add_executable(e2e_tests main.cpp test_e2e_integration.cpp test_server_fixtures.cpp)
 target_include_directories(e2e_tests PUBLIC
+                           "${PROJECT_BINARY_DIR}"
+                           "${PROJECT_SOURCE_DIR}/birdhub/video"
+                           "${PROJECT_SOURCE_DIR}/birdhub/events"
+                           "${PROJECT_SOURCE_DIR}/birdhub/detection"
+                           "${PROJECT_SOURCE_DIR}/birdhub/orchestration"
+                           "${PROJECT_SOURCE_DIR}/birdhub/recording"
+                           "${PROJECT_SOURCE_DIR}/birdhub/memory_management"
+                           "${PROJECT_SOURCE_DIR}/birdhub/effectors"
+                           "${PROJECT_SOURCE_DIR}/birdhub/remote_events"
+                           ${OpenCV_INCLUDE_DIRS}
+                           )
+target_compile_definitions(e2e_tests PRIVATE BIRDHUB_SERVER_DIR="${CMAKE_SOURCE_DIR}/birdhub-server")
+target_link_libraries(e2e_tests PRIVATE doctest::doctest ${OpenCV_LIBS})
+target_link_libraries(e2e_tests PUBLIC Events Video Detection Orchestration Recorder MemoryManagement test_utils Effectors RemoteEvents)
+
+# add executable for performance test files  
+add_executable(perf_tests main.cpp test_e2e_performance.cpp)
+target_include_directories(perf_tests PUBLIC
                            "${PROJECT_BINARY_DIR}"
                            "${PROJECT_SOURCE_DIR}/birdhub/video"
                            "${PROJECT_SOURCE_DIR}/birdhub/events"
@@ -42,5 +60,5 @@ target_include_directories(e2e_tests PUBLIC
                            "${PROJECT_SOURCE_DIR}/birdhub/memory_management"
                            ${OpenCV_INCLUDE_DIRS}
                            )
-target_link_libraries(e2e_tests PRIVATE doctest::doctest ${OpenCV_LIBS})
-target_link_libraries(e2e_tests PUBLIC Events Video Detection Orchestration Recorder MemoryManagement test_utils)
+target_link_libraries(perf_tests PRIVATE doctest::doctest ${OpenCV_LIBS})
+target_link_libraries(perf_tests PUBLIC Events Video Detection Orchestration Recorder MemoryManagement test_utils)
